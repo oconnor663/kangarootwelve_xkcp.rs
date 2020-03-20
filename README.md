@@ -1,6 +1,16 @@
+# kangarootwelve-xkcp
+
 A Rust wrapper around the [eXtended Keccak Code Package
 implementation](https://github.com/XKCP/K12) of the
 [KangarooTwelve](https://keccak.team/kangarootwelve.html) cryptographic
 hash function. That implementation includes SSSE3, AVX2, and AVX-512
 optimizations, and it detects processor support at runtime. The `k12sum`
 sub-crate provides a command line interface.
+
+## License
+
+The Rust wrapping code in this project is released into the public
+domain via [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+Vendored [XKCP](https://github.com/XKCP/XKCP) code is covered by a
+[mixture of
+licenses](https://github.com/XKCP/XKCP#under-which-license-is-the-xkcp-distributed).
