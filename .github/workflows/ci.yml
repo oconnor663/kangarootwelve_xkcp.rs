@@ -26,8 +26,8 @@ jobs:
         profile: minimal
         override: true
     - run: cargo test
-    - run: rustup target add i686-unknown-linux-musl
-    - run: CFLAGS=-m32 cargo test --target i686-unknown-linux-musl
+    - run: rustup target add i686-unknown-linux-gnu
+    - run: CFLAGS=-m32 cargo test --target i686-unknown-linux-gnu
     # Test benchmarks. RUSTC_BOOTSTRAP=1 lets this run on non-nightly toolchains.
     - run: cargo test --benches
       env:
