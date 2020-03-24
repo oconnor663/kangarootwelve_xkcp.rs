@@ -1,14 +1,24 @@
+// ffi_generic64.rs is almost exactly the output from bindgen. However, we need
+// to manually insert some extra padding (see the XXX comment within), to work
+// around https://github.com/rust-lang/rust-bindgen/issues/1753. Be careful to
+// preserve this tweak when regenerating this file, until that issue is fixed.
+#[path = "ffi_generic64.rs"]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+mod ffi;
+
 use std::fmt;
 use std::mem::MaybeUninit;
 
 #[derive(Clone)]
-pub struct Hasher(KangarooTwelve_Instance);
+pub struct Hasher(ffi::KangarooTwelve_Instance);
 
 impl Hasher {
     pub fn new() -> Self {
         let mut inner = MaybeUninit::uninit();
         let inner = unsafe {
-            let ret = KangarooTwelve_Initialize(inner.as_mut_ptr(), 0);
+            let ret = ffi::KangarooTwelve_Initialize(inner.as_mut_ptr(), 0);
             debug_assert_eq!(0, ret);
             inner.assume_init()
         };
@@ -16,7 +26,11 @@ impl Hasher {
         debug_assert_eq!(0, inner.fixedOutputLength);
         debug_assert_eq!(0, inner.blockNumber);
         debug_assert_eq!(0, inner.queueAbsorbedLen);
-        debug_assert_eq!(KCP_PHASES_ABSORBING, inner.phase);
+        debug_assert_eq!(ffi::KCP_Phases_ABSORBING, inner.phase);
+        // Go ahead and use these three so that they're not dead code.
+        debug_assert!(ffi::KCP_Phases_NOT_INITIALIZED != inner.phase);
+        debug_assert!(ffi::KCP_Phases_FINAL != inner.phase);
+        debug_assert!(ffi::KCP_Phases_SQUEEZING != inner.phase);
         debug_assert_eq!(1600 - 256, inner.finalNode.rate);
         debug_assert_eq!(0, inner.finalNode.byteIOIndex);
         debug_assert_eq!(0, inner.finalNode.squeezing);
@@ -25,11 +39,13 @@ impl Hasher {
 
     pub fn update(&mut self, input: &[u8]) {
         assert_eq!(
-            KCP_PHASES_ABSORBING, self.0.phase,
+            ffi::KCP_Phases_ABSORBING,
+            self.0.phase,
             "this instance has already been finalized"
         );
         unsafe {
-            let ret = KangarooTwelve_Update(&mut self.0, input.as_ptr(), input.len() as u64);
+            let ret =
+                ffi::KangarooTwelve_Update(&mut self.0, input.as_ptr(), input.len() as ffi::size_t);
             debug_assert_eq!(0, ret);
         }
     }
@@ -40,18 +56,23 @@ impl Hasher {
 
     pub fn finalize_custom(&mut self, customization: &[u8], output: &mut [u8]) {
         assert_eq!(
-            KCP_PHASES_ABSORBING, self.0.phase,
+            ffi::KCP_Phases_ABSORBING,
+            self.0.phase,
             "this instance has already been finalized"
         );
         unsafe {
-            let ret = KangarooTwelve_Final(
+            let ret = ffi::KangarooTwelve_Final(
                 &mut self.0,
                 std::ptr::null_mut(),
                 customization.as_ptr(),
-                customization.len() as u64,
+                customization.len() as ffi::size_t,
             );
             debug_assert_eq!(0, ret);
-            let ret = KangarooTwelve_Squeeze(&mut self.0, output.as_mut_ptr(), output.len() as u64);
+            let ret = ffi::KangarooTwelve_Squeeze(
+                &mut self.0,
+                output.as_mut_ptr(),
+                output.len() as ffi::size_t,
+            );
             debug_assert_eq!(0, ret);
         }
     }
@@ -67,99 +88,6 @@ impl fmt::Debug for Hasher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Hasher").finish()
     }
-}
-
-// const KCP_PHASES_NOT_INITIALIZED: u32 = 0;
-const KCP_PHASES_ABSORBING: u32 = 1;
-// const KCP_PHASES_FINAL: u32 = 2;
-// const KCP_PHASES_SQUEEZING: u32 = 3;
-
-// XXX: This struct should have an alignment of 64. However, in Rust that
-// causes it to have a size of 256, while in C it's supposed to have a size of
-// 212. As a workaround, we promote its alignment requirement onto
-// KangarooTwelve_Instance and add _padding there. Thus this struct should
-// never be instantiated except as part of a KangarooTwelve_Instance. (However,
-// we don't expose any C functions that would accept it, so it might not be
-// possible to cause harm in practice.)
-//
-// For more about this, see https://github.com/rust-lang/rust-bindgen/issues/1753.
-#[repr(C)]
-#[derive(Copy, Clone)]
-#[allow(non_snake_case)]
-struct KeccakWidth1600_12rounds_SpongeInstanceStruct {
-    state: [::std::os::raw::c_uchar; 200usize],
-    rate: ::std::os::raw::c_uint,
-    byteIOIndex: ::std::os::raw::c_uint,
-    squeezing: ::std::os::raw::c_int,
-}
-
-#[repr(C)]
-#[repr(align(64))]
-#[derive(Copy, Clone)]
-#[allow(non_snake_case)]
-struct KangarooTwelve_Instance {
-    queueNode: KeccakWidth1600_12rounds_SpongeInstanceStruct,
-    // XXX: Bindgen doesn't currently generate this padding correctly. See
-    // https://github.com/rust-lang/rust-bindgen/issues/1753 for details.
-    _padding: [u8; 44],
-    finalNode: KeccakWidth1600_12rounds_SpongeInstanceStruct,
-    fixedOutputLength: ::std::os::raw::c_ulong,
-    blockNumber: ::std::os::raw::c_ulong,
-    queueAbsorbedLen: ::std::os::raw::c_uint,
-    phase: u32,
-}
-
-extern "C" {
-    #[doc = " Function to initialize a KangarooTwelve instance."]
-    #[doc = " @param  ktInstance      Pointer to the instance to be initialized."]
-    #[doc = " @param  outputByteLen   The desired number of output bytes,"]
-    #[doc = "                         or 0 for an arbitrarily-long output."]
-    #[doc = " @return 0 if successful, 1 otherwise."]
-    fn KangarooTwelve_Initialize(
-        ktInstance: *mut KangarooTwelve_Instance,
-        outputByteLen: ::std::os::raw::c_ulong,
-    ) -> ::std::os::raw::c_int;
-
-    #[doc = " Function to give input data to be absorbed."]
-    #[doc = " @param  ktInstance      Pointer to the instance initialized by KangarooTwelve_Initialize()."]
-    #[doc = " @param  input           Pointer to the input message data (M)."]
-    #[doc = " @param  inputByteLen    The number of bytes provided in the input message data."]
-    #[doc = " @return 0 if successful, 1 otherwise."]
-    fn KangarooTwelve_Update(
-        ktInstance: *mut KangarooTwelve_Instance,
-        input: *const ::std::os::raw::c_uchar,
-        inputByteLen: ::std::os::raw::c_ulong,
-    ) -> ::std::os::raw::c_int;
-
-    #[doc = " Function to call after all the input message has been input, and to get"]
-    #[doc = " output bytes if the length was specified when calling KangarooTwelve_Initialize()."]
-    #[doc = " @param  ktInstance      Pointer to the hash instance initialized by KangarooTwelve_Initialize()."]
-    #[doc = " If @a outputByteLen was not 0 in the call to KangarooTwelve_Initialize(), the number of"]
-    #[doc = "     output bytes is equal to @a outputByteLen."]
-    #[doc = " If @a outputByteLen was 0 in the call to KangarooTwelve_Initialize(), the output bytes"]
-    #[doc = "     must be extracted using the KangarooTwelve_Squeeze() function."]
-    #[doc = " @param  output          Pointer to the buffer where to store the output data."]
-    #[doc = " @param  customization   Pointer to the customization string (C)."]
-    #[doc = " @param  customByteLen   The length of the customization string in bytes."]
-    #[doc = " @return 0 if successful, 1 otherwise."]
-    fn KangarooTwelve_Final(
-        ktInstance: *mut KangarooTwelve_Instance,
-        output: *mut ::std::os::raw::c_uchar,
-        customization: *const ::std::os::raw::c_uchar,
-        customByteLen: ::std::os::raw::c_ulong,
-    ) -> ::std::os::raw::c_int;
-
-    #[doc = " Function to squeeze output data."]
-    #[doc = " @param  ktInstance     Pointer to the hash instance initialized by KangarooTwelve_Initialize()."]
-    #[doc = " @param  data           Pointer to the buffer where to store the output data."]
-    #[doc = " @param  outputByteLen  The number of output bytes desired."]
-    #[doc = " @pre    KangarooTwelve_Final() must have been already called."]
-    #[doc = " @return 0 if successful, 1 otherwise."]
-    fn KangarooTwelve_Squeeze(
-        ktInstance: *mut KangarooTwelve_Instance,
-        output: *mut ::std::os::raw::c_uchar,
-        outputByteLen: ::std::os::raw::c_ulong,
-    ) -> ::std::os::raw::c_int;
 }
 
 #[cfg(test)]
@@ -329,167 +257,5 @@ mod test {
         let mut customization = vec![0; 41 * 41 * 41];
         fill_pattern(&mut customization);
         assert_eq!(expected, k12_hex(&input, &customization, 32));
-    }
-
-    #[test]
-    fn test_layout_sponge_instance() {
-        assert_eq!(
-            ::std::mem::size_of::<KeccakWidth1600_12rounds_SpongeInstanceStruct>(),
-            212usize,
-            concat!(
-                "Size of: ",
-                stringify!(KeccakWidth1600_12rounds_SpongeInstanceStruct)
-            )
-        );
-        // XXX: This is strictly wrong. It should have an alignment of 64. See
-        // the comment above the struct definition.
-        assert_eq!(
-            ::std::mem::align_of::<KeccakWidth1600_12rounds_SpongeInstanceStruct>(),
-            4usize,
-            concat!(
-                "Alignment of ",
-                stringify!(KeccakWidth1600_12rounds_SpongeInstanceStruct)
-            )
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KeccakWidth1600_12rounds_SpongeInstanceStruct>())).state
-                    as *const _ as usize
-            },
-            0usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KeccakWidth1600_12rounds_SpongeInstanceStruct),
-                "::",
-                stringify!(state)
-            )
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KeccakWidth1600_12rounds_SpongeInstanceStruct>())).rate
-                    as *const _ as usize
-            },
-            200usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KeccakWidth1600_12rounds_SpongeInstanceStruct),
-                "::",
-                stringify!(rate)
-            )
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KeccakWidth1600_12rounds_SpongeInstanceStruct>()))
-                    .byteIOIndex as *const _ as usize
-            },
-            204usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KeccakWidth1600_12rounds_SpongeInstanceStruct),
-                "::",
-                stringify!(byteIOIndex)
-            )
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KeccakWidth1600_12rounds_SpongeInstanceStruct>())).squeezing
-                    as *const _ as usize
-            },
-            208usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KeccakWidth1600_12rounds_SpongeInstanceStruct),
-                "::",
-                stringify!(squeezing)
-            )
-        );
-    }
-
-    #[test]
-    fn test_layout_instance() {
-        assert_eq!(
-            ::std::mem::size_of::<KangarooTwelve_Instance>(),
-            512usize,
-            concat!("Size of: ", stringify!(KangarooTwelve_Instance))
-        );
-        assert_eq!(
-            ::std::mem::align_of::<KangarooTwelve_Instance>(),
-            64usize,
-            concat!("Alignment of ", stringify!(KangarooTwelve_Instance))
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KangarooTwelve_Instance>())).queueNode as *const _ as usize
-            },
-            0usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KangarooTwelve_Instance),
-                "::",
-                stringify!(queueNode)
-            )
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KangarooTwelve_Instance>())).finalNode as *const _ as usize
-            },
-            256usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KangarooTwelve_Instance),
-                "::",
-                stringify!(finalNode)
-            )
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KangarooTwelve_Instance>())).fixedOutputLength as *const _
-                    as usize
-            },
-            472usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KangarooTwelve_Instance),
-                "::",
-                stringify!(fixedOutputLength)
-            )
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KangarooTwelve_Instance>())).blockNumber as *const _ as usize
-            },
-            480usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KangarooTwelve_Instance),
-                "::",
-                stringify!(blockNumber)
-            )
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KangarooTwelve_Instance>())).queueAbsorbedLen as *const _
-                    as usize
-            },
-            488usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KangarooTwelve_Instance),
-                "::",
-                stringify!(queueAbsorbedLen)
-            )
-        );
-        assert_eq!(
-            unsafe {
-                &(*(::std::ptr::null::<KangarooTwelve_Instance>())).phase as *const _ as usize
-            },
-            492usize,
-            concat!(
-                "Offset of field: ",
-                stringify!(KangarooTwelve_Instance),
-                "::",
-                stringify!(phase)
-            )
-        );
     }
 }
