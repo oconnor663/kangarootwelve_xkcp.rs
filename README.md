@@ -7,6 +7,23 @@ hash function. That implementation includes SSSE3, AVX2, and AVX-512
 optimizations, and it detects processor support at runtime. The `k12sum`
 sub-crate provides a command line interface.
 
+## Building
+
+[As with XKCP
+upstream](https://github.com/XKCP/XKCP#how-can-i-build-the-xkcp), the
+following tools are needed:
+
+- GCC
+- GNU make
+- xsltproc
+  - **Important!** You probably don't have this one, which will lead to
+    a confusing build error. Install it first with `apt-get install
+    xsltproc` or similar.
+
+This crate is currently tested only on Linux. Building on macOS or
+Windows might work, with the dependencies listed above. But if you try
+it and run into trouble, please open an issue.
+
 ## License
 
 The Rust wrapping code in this project is released into the public
