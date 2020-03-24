@@ -1,4 +1,4 @@
-# kangarootwelve-xkcp
+# kangarootwelve-xkcp [![Actions Status](https://github.com/oconnor663/kangarootwelve-xkcp/workflows/tests/badge.svg)](https://github.com/oconnor663/kangarootwelve-xkcp/actions)
 
 A Rust wrapper around the [eXtended Keccak Code Package
 implementation](https://github.com/XKCP/K12) of the

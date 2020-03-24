@@ -1,0 +1,58 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - "*"
+    # not on tags
+  pull_request:
+
+jobs:
+  cargo_tests:
+    name: ${{ matrix.target.name }} ${{ matrix.channel }}
+    runs-on: ${{ matrix.target.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [
+          { "os": "ubuntu-latest",  "toolchain": "x86_64-unknown-linux-gnu", "name": "Linux GNU" },
+          { "os": "macOS-latest",   "toolchain": "x86_64-apple-darwin",      "name": "macOS" },
+          { "os": "windows-latest", "toolchain": "x86_64-pc-windows-msvc",   "name": "Windows MSVC" },
+          { "os": "windows-latest", "toolchain": "x86_64-pc-windows-gnu",    "name": "Windows GNU" }
+        ]
+        channel: [stable, beta, nightly]
+
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ format('{0}-{1}', matrix.channel, matrix.target.toolchain) }}
+        profile: minimal
+        override: true
+    - run: cargo test
+    - run: cargo test --no-default-features
+    # Test benchmarks. RUSTC_BOOTSTRAP=1 lets this run on non-nightly toolchains.
+    - run: cargo test --benches
+      env:
+        RUSTC_BOOTSTRAP: 1
+
+  cross_tests:
+    name: cross ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - i686-unknown-linux-musl
+          - armv7-unknown-linux-gnueabihf
+          - aarch64-unknown-linux-gnu
+          - mips-unknown-linux-gnu
+
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    - run: cargo install cross
+    - run: cross test --target ${{ matrix.arch }}
