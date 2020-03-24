@@ -1,8 +1,16 @@
-// ffi_generic64.rs is almost exactly the output from bindgen. However, we need
-// to manually insert some extra padding (see the XXX comment within), to work
-// around https://github.com/rust-lang/rust-bindgen/issues/1753. Be careful to
-// preserve this tweak when regenerating this file, until that issue is fixed.
+// ffi_generic32.rs and ffi_generic64.rs are almost exactly the output from
+// bindgen. However, we need to manually insert some extra padding (see the XXX
+// comments), to work around https://github.com/rust-lang/rust-bindgen/issues/1753.
+// Be careful to preserve this tweak when regenerating these files, until that
+// issue is fixed.
+#[cfg(k12_target = "generic64")]
 #[path = "ffi_generic64.rs"]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+mod ffi;
+#[cfg(k12_target = "generic32")]
+#[path = "ffi_generic32.rs"]
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
