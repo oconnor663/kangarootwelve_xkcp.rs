@@ -11,6 +11,7 @@ const LENGTH_ARG: &str = "length";
 const NO_NAMES_ARG: &str = "no-names";
 const RAW_ARG: &str = "raw";
 const CUSTOM_ARG: &str = "custom";
+const MMAP_ARG: &str = "mmap";
 
 fn clap_parse_argv() -> clap::ArgMatches<'static> {
     App::new("k12sum")
@@ -42,7 +43,12 @@ fn clap_parse_argv() -> clap::ArgMatches<'static> {
                 .long(CUSTOM_ARG)
                 .takes_value(true)
                 .value_name("STR")
-                .help("The optional customization string."),
+                .help("The optional customization string"),
+        )
+        .arg(
+            Arg::with_name(MMAP_ARG)
+                .long(MMAP_ARG)
+                .help("Reads the input using memory mapping"),
         )
         .get_matches()
 }
@@ -64,10 +70,40 @@ fn copy_wide(mut reader: impl Read, hasher: &mut Hasher) -> io::Result<u64> {
     }
 }
 
-fn hash_reader(reader: impl Read, customization: &str) -> Result<OutputReader> {
+fn hash_reader(reader: impl Read, customization: &[u8]) -> Result<OutputReader> {
     let mut hasher = Hasher::new();
     copy_wide(reader, &mut hasher)?;
-    Ok(hasher.finalize_custom_xof(customization.as_bytes()))
+    Ok(hasher.finalize_custom_xof(customization))
+}
+
+fn mmap_file(file: &File) -> Result<memmap::Mmap> {
+    let metadata = file.metadata()?;
+    let file_size = metadata.len();
+    if !metadata.is_file() {
+        bail!("not a real file")
+    } else if file_size > isize::max_value() as u64 {
+        // https://github.com/danburkert/memmap-rs/issues/69
+        bail!("too long to safely map")
+    } else if file_size == 0 {
+        // https://github.com/danburkert/memmap-rs/issues/72
+        bail!("cannot mmap empty file")
+    } else {
+        // Explicitly set the length of the memory map, so that filesystem
+        // changes can't race to violate the invariants we just checked.
+        let mmap = unsafe {
+            memmap::MmapOptions::new()
+                .len(file_size as usize)
+                .map(&file)?
+        };
+        Ok(mmap)
+    }
+}
+
+fn hash_mmap(file: &File, customization: &[u8]) -> Result<OutputReader> {
+    let mmap = mmap_file(file).context("mmap failed")?;
+    let mut hasher = Hasher::new();
+    hasher.update(&mmap);
+    Ok(hasher.finalize_custom_xof(customization))
 }
 
 fn write_hex_output(mut output: OutputReader, mut len: u64) -> Result<()> {
@@ -95,9 +131,17 @@ fn write_raw_output(output: OutputReader, len: u64) -> Result<()> {
 }
 
 // Errors from this function get handled by the file loop and printed per-file.
-fn hash_file(filepath: &std::ffi::OsStr, customization: &str) -> Result<OutputReader> {
+fn hash_file(
+    filepath: &std::ffi::OsStr,
+    customization: &[u8],
+    use_mmap: bool,
+) -> Result<OutputReader> {
     let file = File::open(filepath)?;
-    hash_reader(file, customization)
+    if use_mmap {
+        hash_mmap(&file, customization)
+    } else {
+        hash_reader(file, customization)
+    }
 }
 
 fn main() -> Result<()> {
@@ -109,7 +153,8 @@ fn main() -> Result<()> {
     };
     let print_names = !args.is_present(NO_NAMES_ARG);
     let raw_output = args.is_present(RAW_ARG);
-    let customization = args.value_of(CUSTOM_ARG).unwrap_or("");
+    let customization = args.value_of(CUSTOM_ARG).unwrap_or("").as_bytes();
+    let use_mmap = args.is_present(MMAP_ARG);
 
     let mut did_error = false;
     if let Some(files) = args.values_of_os(FILE_ARG) {
@@ -118,7 +163,7 @@ fn main() -> Result<()> {
         }
         for filepath in files {
             let filepath_str = filepath.to_string_lossy();
-            match hash_file(filepath, customization) {
+            match hash_file(filepath, customization, use_mmap) {
                 Ok(output) => {
                     if raw_output {
                         write_raw_output(output, output_len)?;
@@ -138,6 +183,9 @@ fn main() -> Result<()> {
             }
         }
     } else {
+        if use_mmap {
+            bail!("k12sum: cannot use --mmap with standard input");
+        }
         let stdin = std::io::stdin();
         let stdin = stdin.lock();
         let output = hash_reader(stdin, customization)?;

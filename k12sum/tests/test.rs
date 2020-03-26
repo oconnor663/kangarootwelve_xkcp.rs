@@ -51,6 +51,12 @@ fn test_hash_many() {
         .unwrap();
     let expected_no_names = format!("{}\n{}", foo_hash.to_hex(), bar_hash.to_hex());
     assert_eq!(expected_no_names, output_no_names);
+
+    // Repeat that, with --mmap.
+    let output_mmap = cmd!(k12sum_exe(), "--no-names", "--mmap", &file1, &file2)
+        .read()
+        .unwrap();
+    assert_eq!(expected_no_names, output_mmap);
 }
 
 #[test]
@@ -100,6 +106,15 @@ fn test_raw_with_multi_files_is_an_error() {
 
     // Make sure it errors when both file are passed
     let result = cmd!(k12sum_exe(), "--raw", f1.path(), f2.path())
+        .stderr_capture()
+        .run();
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_mmap_stdin_is_an_error() {
+    let result = cmd!(k12sum_exe(), "--mmap")
+        .stdin_bytes("foo")
         .stderr_capture()
         .run();
     assert!(result.is_err());
