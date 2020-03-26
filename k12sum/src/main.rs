@@ -10,6 +10,7 @@ const FILE_ARG: &str = "file";
 const LENGTH_ARG: &str = "length";
 const NO_NAMES_ARG: &str = "no-names";
 const RAW_ARG: &str = "raw";
+const CUSTOM_ARG: &str = "custom";
 
 fn clap_parse_argv() -> clap::ArgMatches<'static> {
     App::new("k12sum")
@@ -36,6 +37,13 @@ fn clap_parse_argv() -> clap::ArgMatches<'static> {
              --no-names is implied. In this case, only a single\n\
              input is allowed.",
         ))
+        .arg(
+            Arg::with_name(CUSTOM_ARG)
+                .long(CUSTOM_ARG)
+                .takes_value(true)
+                .value_name("STR")
+                .help("The optional customization string."),
+        )
         .get_matches()
 }
 
@@ -56,10 +64,10 @@ fn copy_wide(mut reader: impl Read, hasher: &mut Hasher) -> io::Result<u64> {
     }
 }
 
-fn hash_reader(reader: impl Read) -> Result<OutputReader> {
+fn hash_reader(reader: impl Read, customization: &str) -> Result<OutputReader> {
     let mut hasher = Hasher::new();
     copy_wide(reader, &mut hasher)?;
-    Ok(hasher.finalize_xof())
+    Ok(hasher.finalize_custom_xof(customization.as_bytes()))
 }
 
 fn write_hex_output(mut output: OutputReader, mut len: u64) -> Result<()> {
@@ -87,9 +95,9 @@ fn write_raw_output(output: OutputReader, len: u64) -> Result<()> {
 }
 
 // Errors from this function get handled by the file loop and printed per-file.
-fn hash_file(filepath: &std::ffi::OsStr) -> Result<OutputReader> {
+fn hash_file(filepath: &std::ffi::OsStr, customization: &str) -> Result<OutputReader> {
     let file = File::open(filepath)?;
-    hash_reader(file)
+    hash_reader(file, customization)
 }
 
 fn main() -> Result<()> {
@@ -101,6 +109,7 @@ fn main() -> Result<()> {
     };
     let print_names = !args.is_present(NO_NAMES_ARG);
     let raw_output = args.is_present(RAW_ARG);
+    let customization = args.value_of(CUSTOM_ARG).unwrap_or("");
 
     let mut did_error = false;
     if let Some(files) = args.values_of_os(FILE_ARG) {
@@ -109,7 +118,7 @@ fn main() -> Result<()> {
         }
         for filepath in files {
             let filepath_str = filepath.to_string_lossy();
-            match hash_file(filepath) {
+            match hash_file(filepath, customization) {
                 Ok(output) => {
                     if raw_output {
                         write_raw_output(output, output_len)?;
@@ -131,7 +140,7 @@ fn main() -> Result<()> {
     } else {
         let stdin = std::io::stdin();
         let stdin = stdin.lock();
-        let output = hash_reader(stdin)?;
+        let output = hash_reader(stdin, customization)?;
         if raw_output {
             write_raw_output(output, output_len)?;
         } else {

@@ -54,6 +54,18 @@ fn test_hash_many() {
 }
 
 #[test]
+fn test_customization() {
+    let mut hasher = Hasher::new();
+    hasher.update(b"foo");
+    let expected = hasher.finalize_custom(b"bar");
+    let output = cmd!(k12sum_exe(), "--custom", "bar")
+        .stdin_bytes("foo")
+        .read()
+        .unwrap();
+    assert_eq!(expected.to_hex().as_str(), output);
+}
+
+#[test]
 fn test_hash_length() {
     let mut hasher = Hasher::new();
     hasher.update(b"foo");
