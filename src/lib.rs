@@ -201,6 +201,55 @@ impl fmt::Debug for Hash {
     }
 }
 
+/// An incremental reader for extended output, returned by
+/// [`Hasher::finalize_xof`](struct.Hasher.html#method.finalize_xof).
+#[derive(Clone)]
+pub struct OutputReader(ffi::KangarooTwelve_Instance);
+
+impl OutputReader {
+    /// Fill a buffer with output bytes and advance the position of the
+    /// `OutputReader`. This is equivalent to [`Read::read`], except that it
+    /// doesn't return a `Result`. Both methods always fill the entire buffer.
+    ///
+    /// Note that `OutputReader` doesn't buffer output bytes internally, so
+    /// calling `fill` repeatedly with a short-length or odd-length slice will
+    /// end up performing the same compression multiple times. If you're
+    /// reading output in a loop, prefer a slice length that's a multiple of
+    /// 64.
+    ///
+    /// [`Read::read`]: #method.read
+    pub fn fill(&mut self, buf: &mut [u8]) {
+        debug_assert_eq!(
+            ffi::KCP_Phases_SQUEEZING,
+            self.0.phase,
+            "this instance has not yet been finalized"
+        );
+        unsafe {
+            let ret = ffi::KangarooTwelve_Squeeze(
+                &mut self.0,
+                buf.as_mut_ptr(),
+                buf.len() as ffi::size_t,
+            );
+            debug_assert_eq!(0, ret);
+        }
+    }
+}
+
+// Don't derive(Debug), because the state may be secret.
+impl fmt::Debug for OutputReader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "OutputReader {{ ... }}")
+    }
+}
+
+impl std::io::Read for OutputReader {
+    #[inline]
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.fill(buf);
+        Ok(buf.len())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
