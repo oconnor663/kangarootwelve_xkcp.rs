@@ -4,6 +4,7 @@ fn main() {
     let mut build = cc::Build::new();
     build.include("XKCP-K12/lib");
     build.file("XKCP-K12/lib/KangarooTwelve.c");
+
     let k12_target;
     match env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap().as_str() {
         "64" => {
@@ -36,10 +37,26 @@ fn main() {
             build.file("XKCP-K12/lib/Inplace32BI/KeccakP-1600-inplace32BI.c");
             // The 32-bit code includes a switch with intentional fallthrough.
             build.flag("-Wno-implicit-fallthrough");
+            // The 32-bit code has some unused variables.
+            build.flag("-Wno-unused-variable");
             k12_target = "generic32";
         }
         x => panic!("unexpected target pointer width: {}", x),
     };
-    build.compile("k12");
     println!("cargo:rustc-cfg=k12_target=\"{}\"", k12_target);
+
+    // brg_endian.h tries to detect the target endianness, but it fails on e.g.
+    // mips. Cargo knows better, so we explicitly set the preprocessor
+    // variables that brg_endian.h looks for.
+    match env::var("CARGO_CFG_TARGET_ENDIAN").unwrap().as_str() {
+        "little" => {
+            build.define("LITTLE_ENDIAN", "1");
+        }
+        "big" => {
+            build.define("BIG_ENDIAN", "1");
+        }
+        s => panic!("unexpected target endianness: {}", s),
+    }
+
+    build.compile("k12");
 }
