@@ -36,9 +36,9 @@ fn main() {
         build.include("XKCP-K12/lib/Inplace32BI");
         build.file("XKCP-K12/lib/Inplace32BI/KeccakP-1600-inplace32BI.c");
         // The 32-bit code includes a switch with intentional fallthrough.
-        build.flag("-Wno-implicit-fallthrough");
+        build.flag_if_supported("-Wno-implicit-fallthrough");
         // The 32-bit code has some unused variables.
-        build.flag("-Wno-unused-variable");
+        build.flag_if_supported("-Wno-unused-variable");
     }
     println!("cargo:rustc-cfg=k12_target=\"{}\"", k12_target);
 
