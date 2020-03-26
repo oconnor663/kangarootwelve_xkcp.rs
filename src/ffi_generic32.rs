@@ -110,9 +110,13 @@ pub struct KangarooTwelve_Instance {
 }
 #[test]
 fn bindgen_test_layout_KangarooTwelve_Instance() {
+    // XXX: Because we use these definitions on both 32-bit and (non-x86)
+    // 64-bit systems, we need to manually adjust these layout tests.
+    let usize_size = ::std::mem::size_of::<usize>();
+    let expected_size = 440 + 2 * usize_size;
     assert_eq!(
         ::std::mem::size_of::<KangarooTwelve_Instance>(),
-        456usize,
+        expected_size,
         concat!("Size of: ", stringify!(KangarooTwelve_Instance))
     );
     assert_eq!(
@@ -144,12 +148,17 @@ fn bindgen_test_layout_KangarooTwelve_Instance() {
             stringify!(finalNode)
         )
     );
+    let mut fixed_output_length_offset = 428;
+    let usize_align = ::std::mem::align_of::<usize>();
+    if fixed_output_length_offset % usize_align != 0 {
+        fixed_output_length_offset += usize_align - (fixed_output_length_offset % usize_align);
+    }
     assert_eq!(
         unsafe {
             &(*(::std::ptr::null::<KangarooTwelve_Instance>())).fixedOutputLength as *const _
                 as usize
         },
-        432usize,
+        fixed_output_length_offset,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_Instance),
@@ -161,7 +170,7 @@ fn bindgen_test_layout_KangarooTwelve_Instance() {
         unsafe {
             &(*(::std::ptr::null::<KangarooTwelve_Instance>())).blockNumber as *const _ as usize
         },
-        440usize,
+        fixed_output_length_offset + usize_size,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_Instance),
@@ -174,7 +183,7 @@ fn bindgen_test_layout_KangarooTwelve_Instance() {
             &(*(::std::ptr::null::<KangarooTwelve_Instance>())).queueAbsorbedLen as *const _
                 as usize
         },
-        448usize,
+        fixed_output_length_offset + 2 * usize_size,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_Instance),
@@ -184,7 +193,9 @@ fn bindgen_test_layout_KangarooTwelve_Instance() {
     );
     assert_eq!(
         unsafe { &(*(::std::ptr::null::<KangarooTwelve_Instance>())).phase as *const _ as usize },
-        452usize,
+        fixed_output_length_offset
+            + 2 * usize_size
+            + ::std::mem::size_of::<::std::os::raw::c_uint>(),
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_Instance),
