@@ -46,13 +46,7 @@ impl RandomInput {
 
 fn bench_atonce(b: &mut Bencher, len: usize) {
     let mut input = RandomInput::new(b, len);
-    b.iter(|| {
-        let mut hasher = kangarootwelve_xkcp::Hasher::new();
-        hasher.update(input.get());
-        let mut out = [0; 32];
-        hasher.finalize(&mut out);
-        out
-    });
+    b.iter(|| kangarootwelve_xkcp::hash(input.get()));
 }
 
 #[bench]
