@@ -20,6 +20,14 @@ use arrayvec::ArrayString;
 use std::fmt;
 use std::mem::MaybeUninit;
 
+pub const RATE: usize = 168; // (1600 - 256) / 8
+
+pub fn hash(input: &[u8]) -> Hash {
+    let mut hasher = Hasher::new();
+    hasher.update(input);
+    hasher.finalize()
+}
+
 #[derive(Clone)]
 pub struct Hasher(ffi::KangarooTwelve_Instance);
 
@@ -59,11 +67,40 @@ impl Hasher {
         }
     }
 
-    pub fn finalize(&mut self, output: &mut [u8]) {
-        self.finalize_custom(&[], output);
+    pub fn finalize(&mut self) -> Hash {
+        self.finalize_custom(&[])
     }
 
-    pub fn finalize_custom(&mut self, customization: &[u8], output: &mut [u8]) {
+    pub fn finalize_custom(&mut self, customization: &[u8]) -> Hash {
+        assert_eq!(
+            ffi::KCP_Phases_ABSORBING,
+            self.0.phase,
+            "this instance has already been finalized"
+        );
+        let mut bytes = [0; 32];
+        unsafe {
+            let ret = ffi::KangarooTwelve_Final(
+                &mut self.0,
+                std::ptr::null_mut(),
+                customization.as_ptr(),
+                customization.len() as ffi::size_t,
+            );
+            debug_assert_eq!(0, ret);
+            let ret = ffi::KangarooTwelve_Squeeze(
+                &mut self.0,
+                bytes.as_mut_ptr(),
+                bytes.len() as ffi::size_t,
+            );
+            debug_assert_eq!(0, ret);
+        }
+        bytes.into()
+    }
+
+    pub fn finalize_xof(&mut self) -> OutputReader {
+        self.finalize_custom_xof(&[])
+    }
+
+    pub fn finalize_custom_xof(&mut self, customization: &[u8]) -> OutputReader {
         assert_eq!(
             ffi::KCP_Phases_ABSORBING,
             self.0.phase,
@@ -77,13 +114,8 @@ impl Hasher {
                 customization.len() as ffi::size_t,
             );
             debug_assert_eq!(0, ret);
-            let ret = ffi::KangarooTwelve_Squeeze(
-                &mut self.0,
-                output.as_mut_ptr(),
-                output.len() as ffi::size_t,
-            );
-            debug_assert_eq!(0, ret);
         }
+        OutputReader(self.0)
     }
 }
 
@@ -202,7 +234,8 @@ impl fmt::Debug for Hash {
 }
 
 /// An incremental reader for extended output, returned by
-/// [`Hasher::finalize_xof`](struct.Hasher.html#method.finalize_xof).
+/// [`Hasher::finalize_xof`](struct.Hasher.html#method.finalize_xof) and
+/// [`Hasher::finalize_custom_xof`](struct.Hasher.html#method.finalize_custom_xof).
 #[derive(Clone)]
 pub struct OutputReader(ffi::KangarooTwelve_Instance);
 
@@ -211,14 +244,8 @@ impl OutputReader {
     /// `OutputReader`. This is equivalent to [`Read::read`], except that it
     /// doesn't return a `Result`. Both methods always fill the entire buffer.
     ///
-    /// Note that `OutputReader` doesn't buffer output bytes internally, so
-    /// calling `fill` repeatedly with a short-length or odd-length slice will
-    /// end up performing the same compression multiple times. If you're
-    /// reading output in a loop, prefer a slice length that's a multiple of
-    /// 64.
-    ///
     /// [`Read::read`]: #method.read
-    pub fn fill(&mut self, buf: &mut [u8]) {
+    pub fn squeeze(&mut self, buf: &mut [u8]) {
         debug_assert_eq!(
             ffi::KCP_Phases_SQUEEZING,
             self.0.phase,
@@ -245,7 +272,7 @@ impl fmt::Debug for OutputReader {
 impl std::io::Read for OutputReader {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.fill(buf);
+        self.squeeze(buf);
         Ok(buf.len())
     }
 }
@@ -258,7 +285,7 @@ mod test {
     #[should_panic]
     fn test_update_after_finalize_panics() {
         let mut hasher = Hasher::new();
-        hasher.finalize(&mut []);
+        hasher.finalize();
         hasher.update(&[]);
     }
 
@@ -266,8 +293,8 @@ mod test {
     #[should_panic]
     fn test_finalize_twice_panics() {
         let mut hasher = Hasher::new();
-        hasher.finalize(&mut []);
-        hasher.finalize(&mut []);
+        hasher.finalize();
+        hasher.finalize();
     }
 
     fn fill_pattern(buf: &mut [u8]) {
@@ -281,15 +308,27 @@ mod test {
         let mut hasher = Hasher::new();
         hasher.update(input);
         let mut output = vec![0; num_output_bytes];
-        hasher.finalize_custom(customization, &mut output);
+        hasher
+            .finalize_custom_xof(customization)
+            .squeeze(&mut output);
 
         // Also check that doing the same hash in two steps gives the same answer.
         let mut hasher2 = Hasher::new();
         hasher2.update(&input[..input.len() / 2]);
         hasher2.update(&input[input.len() / 2..]);
         let mut output2 = vec![0; num_output_bytes];
-        hasher2.finalize_custom(customization, &mut output2);
+        hasher2
+            .finalize_custom_xof(customization)
+            .squeeze(&mut output2);
         assert_eq!(output, output2);
+
+        // And finally, check that the all-at-once function gives the same
+        // answer too.
+        if customization.is_empty() {
+            let hash3 = hash(input);
+            let compare_len = std::cmp::min(hash3.as_bytes().len(), num_output_bytes);
+            assert_eq!(&hash3.as_bytes()[..compare_len], &output[..compare_len]);
+        }
 
         hex::encode(output)
     }

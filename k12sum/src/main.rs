@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use clap::{App, Arg};
-use kangarootwelve_xkcp::Hasher;
+use kangarootwelve_xkcp::{Hasher, OutputReader, RATE};
+use std::cmp;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -55,35 +56,46 @@ fn copy_wide(mut reader: impl Read, hasher: &mut Hasher) -> io::Result<u64> {
     }
 }
 
-fn hash_reader(reader: impl Read, output_len: usize) -> Result<Vec<u8>> {
+fn hash_reader(reader: impl Read) -> Result<OutputReader> {
     let mut hasher = Hasher::new();
     copy_wide(reader, &mut hasher)?;
-    // TODO: a streaming reader
-    let mut hash = vec![0; output_len];
-    hasher.finalize(&mut hash);
-    Ok(hash)
+    Ok(hasher.finalize_xof())
 }
 
-fn write_hex_output(output: &[u8]) -> Result<()> {
-    print!("{}", hex::encode(output));
+fn write_hex_output(mut output: OutputReader, mut len: u64) -> Result<()> {
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    // Encoding multiples of the byte rate is most efficient.
+    let mut block = [0; RATE];
+    while len > 0 {
+        output.squeeze(&mut block);
+        let hex_str = hex::encode(&block[..]);
+        let take_bytes = cmp::min(len, block.len() as u64);
+        stdout.write_all(&hex_str.as_bytes()[..2 * take_bytes as usize])?;
+        len -= take_bytes;
+    }
     Ok(())
 }
 
-fn write_raw_output(output: &[u8]) -> Result<()> {
-    std::io::stdout().write_all(output)?;
+fn write_raw_output(output: OutputReader, len: u64) -> Result<()> {
+    let mut output = output.take(len);
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    std::io::copy(&mut output, &mut stdout)?;
+
     Ok(())
 }
 
 // Errors from this function get handled by the file loop and printed per-file.
-fn hash_file(filepath: &std::ffi::OsStr, output_len: usize) -> Result<Vec<u8>> {
+fn hash_file(filepath: &std::ffi::OsStr) -> Result<OutputReader> {
     let file = File::open(filepath)?;
-    hash_reader(file, output_len)
+    hash_reader(file)
 }
 
 fn main() -> Result<()> {
     let args = clap_parse_argv();
     let output_len = if let Some(length) = args.value_of(LENGTH_ARG) {
-        length.parse::<usize>().context("Failed to parse length.")?
+        length.parse::<u64>().context("Failed to parse length.")?
     } else {
         32
     };
@@ -97,12 +109,12 @@ fn main() -> Result<()> {
         }
         for filepath in files {
             let filepath_str = filepath.to_string_lossy();
-            match hash_file(filepath, output_len) {
+            match hash_file(filepath) {
                 Ok(output) => {
                     if raw_output {
-                        write_raw_output(&output)?;
+                        write_raw_output(output, output_len)?;
                     } else {
-                        write_hex_output(&output)?;
+                        write_hex_output(output, output_len)?;
                         if print_names {
                             println!("  {}", filepath_str);
                         } else {
@@ -119,11 +131,11 @@ fn main() -> Result<()> {
     } else {
         let stdin = std::io::stdin();
         let stdin = stdin.lock();
-        let output = hash_reader(stdin, output_len)?;
+        let output = hash_reader(stdin)?;
         if raw_output {
-            write_raw_output(&output)?;
+            write_raw_output(output, output_len)?;
         } else {
-            write_hex_output(&output)?;
+            write_hex_output(output, output_len)?;
             println!();
         }
     }

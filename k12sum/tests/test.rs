@@ -1,5 +1,5 @@
 use duct::cmd;
-use kangarootwelve_xkcp::Hasher;
+use kangarootwelve_xkcp::{hash, Hasher};
 use std::fs;
 use std::path::PathBuf;
 
@@ -9,27 +9,21 @@ pub fn k12sum_exe() -> PathBuf {
 
 #[test]
 fn test_hash_one() {
-    let mut hasher = Hasher::new();
-    hasher.update(b"foo");
-    let mut expected = [0; 32];
-    hasher.finalize(&mut expected);
+    let expected = hash(b"foo");
     let output = cmd!(k12sum_exe()).stdin_bytes("foo").read().unwrap();
-    assert_eq!(hex::encode(expected), output);
+    assert_eq!(expected.to_hex().as_str(), output);
 }
 
 #[test]
 fn test_hash_one_raw() {
-    let mut hasher = Hasher::new();
-    hasher.update(b"foo");
-    let mut expected = [0; 32];
-    hasher.finalize(&mut expected);
+    let expected = hash(b"foo");
     let output = cmd!(k12sum_exe(), "--raw")
         .stdin_bytes("foo")
         .stdout_capture()
         .run()
         .unwrap()
         .stdout;
-    assert_eq!(expected, output.as_slice());
+    assert_eq!(expected.as_bytes(), output.as_slice());
 }
 
 #[test]
@@ -41,19 +35,13 @@ fn test_hash_many() {
     fs::write(&file2, b"bar").unwrap();
 
     let output = cmd!(k12sum_exe(), &file1, &file2).read().unwrap();
-    let mut foo_hasher = Hasher::new();
-    foo_hasher.update(b"foo");
-    let mut foo_hash = [0; 32];
-    foo_hasher.finalize(&mut foo_hash);
-    let mut bar_hasher = Hasher::new();
-    bar_hasher.update(b"bar");
-    let mut bar_hash = [0; 32];
-    bar_hasher.finalize(&mut bar_hash);
+    let foo_hash = hash(b"foo");
+    let bar_hash = hash(b"bar");
     let expected = format!(
         "{}  {}\n{}  {}",
-        hex::encode(&foo_hash),
+        foo_hash.to_hex(),
         file1.to_string_lossy(),
-        hex::encode(&bar_hash),
+        bar_hash.to_hex(),
         file2.to_string_lossy(),
     );
     assert_eq!(expected, output);
@@ -61,7 +49,7 @@ fn test_hash_many() {
     let output_no_names = cmd!(k12sum_exe(), "--no-names", &file1, &file2)
         .read()
         .unwrap();
-    let expected_no_names = format!("{}\n{}", hex::encode(&foo_hash), hex::encode(&bar_hash),);
+    let expected_no_names = format!("{}\n{}", foo_hash.to_hex(), bar_hash.to_hex());
     assert_eq!(expected_no_names, output_no_names);
 }
 
@@ -70,7 +58,7 @@ fn test_hash_length() {
     let mut hasher = Hasher::new();
     hasher.update(b"foo");
     let mut expected = [0; 100];
-    hasher.finalize(&mut expected);
+    hasher.finalize_xof().squeeze(&mut expected);
     let output = cmd!(k12sum_exe(), "--length=100")
         .stdin_bytes("foo")
         .read()
