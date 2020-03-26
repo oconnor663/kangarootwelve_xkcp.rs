@@ -9,11 +9,12 @@ on:
 
 jobs:
   cargo_tests:
-    name: ${{ matrix.channel }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} ${{ matrix.channel }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
         channel: [stable, beta, nightly]
 
     steps:
