@@ -18,8 +18,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - run: sudo apt-get update
-    - run: sudo apt-get install xsltproc gcc-multilib
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ format('{0}-{1}', matrix.channel, matrix.target.toolchain) }}
