@@ -64,8 +64,7 @@ impl Hasher {
             "this instance has already been finalized"
         );
         unsafe {
-            let ret =
-                ffi::KangarooTwelve_Update(&mut self.0, input.as_ptr(), input.len() as ffi::size_t);
+            let ret = ffi::KangarooTwelve_Update(&mut self.0, input.as_ptr(), input.len());
             debug_assert_eq!(0, ret);
         }
     }
@@ -86,14 +85,10 @@ impl Hasher {
                 &mut self.0,
                 std::ptr::null_mut(),
                 customization.as_ptr(),
-                customization.len() as ffi::size_t,
+                customization.len(),
             );
             debug_assert_eq!(0, ret);
-            let ret = ffi::KangarooTwelve_Squeeze(
-                &mut self.0,
-                bytes.as_mut_ptr(),
-                bytes.len() as ffi::size_t,
-            );
+            let ret = ffi::KangarooTwelve_Squeeze(&mut self.0, bytes.as_mut_ptr(), bytes.len());
             debug_assert_eq!(0, ret);
         }
         bytes.into()
@@ -114,7 +109,7 @@ impl Hasher {
                 &mut self.0,
                 std::ptr::null_mut(),
                 customization.as_ptr(),
-                customization.len() as ffi::size_t,
+                customization.len(),
             );
             debug_assert_eq!(0, ret);
         }
@@ -255,11 +250,7 @@ impl OutputReader {
             "this instance has not yet been finalized"
         );
         unsafe {
-            let ret = ffi::KangarooTwelve_Squeeze(
-                &mut self.0,
-                buf.as_mut_ptr(),
-                buf.len() as ffi::size_t,
-            );
+            let ret = ffi::KangarooTwelve_Squeeze(&mut self.0, buf.as_mut_ptr(), buf.len());
             debug_assert_eq!(0, ret);
         }
     }
