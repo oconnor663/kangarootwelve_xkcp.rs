@@ -25,8 +25,11 @@ jobs:
         profile: minimal
         override: true
     - run: cargo test
-    # Test benchmarks. RUSTC_BOOTSTRAP=1 lets this run on non-nightly toolchains.
-    - run: cargo test --benches
+    - name: test k12sum
+      run: cargo test
+      working-directory: ./k12sum
+    - name: test benchmarks
+      run: cargo test --benches
       env:
         RUSTC_BOOTSTRAP: 1
 

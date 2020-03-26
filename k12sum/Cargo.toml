@@ -1,0 +1,16 @@
+[package]
+name = "k12sum"
+version = "0.1.0"
+authors = ["Jack O'Connor <oconnor663@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.27"
+clap = { version = "2.33.0", default-features = false }
+hex = "0.4.2"
+kangarootwelve-xkcp = { path = ".." }
+
+[dev-dependencies]
+assert_cmd = "0.12.1"
+duct = "0.13.3"
+tempfile = "3.1.0"
