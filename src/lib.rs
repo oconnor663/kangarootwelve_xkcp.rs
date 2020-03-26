@@ -16,6 +16,7 @@ mod ffi;
 #[allow(non_upper_case_globals)]
 mod ffi;
 
+use arrayvec::ArrayString;
 use std::fmt;
 use std::mem::MaybeUninit;
 
@@ -95,6 +96,108 @@ impl Default for Hasher {
 impl fmt::Debug for Hasher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Hasher").finish()
+    }
+}
+
+/// An output of the default size, 32 bytes, which provides constant-time
+/// equality checking.
+///
+/// `Hash` implements [`From`] and [`Into`] for `[u8; 32]`, and it provides an
+/// explicit [`as_bytes`] method returning `&[u8; 32]`. However, byte arrays
+/// and slices don't provide constant-time equality checking, which is often a
+/// security requirement in software that handles private data. `Hash` doesn't
+/// implement [`Deref`] or [`AsRef`], to avoid situations where a type
+/// conversion happens implicitly and the constant-time property is
+/// accidentally lost.
+///
+/// `Hash` provides the [`to_hex`] method for converting to hexadecimal. It
+/// doesn't directly support converting from hexadecimal, but here's an example
+/// of doing that with the [`hex`] crate:
+///
+/// ```
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// # use kangarootwelve_xkcp::Hash;
+/// use std::convert::TryInto;
+///
+/// let hash_hex = "d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24";
+/// let hash_bytes = hex::decode(hash_hex)?;
+/// let hash_array: [u8; 32] = hash_bytes[..].try_into()?;
+/// let hash: Hash = hash_array.into();
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [`From`]: https://doc.rust-lang.org/std/convert/trait.From.html
+/// [`Into`]: https://doc.rust-lang.org/std/convert/trait.Into.html
+/// [`as_bytes`]: #method.as_bytes
+/// [`Deref`]: https://doc.rust-lang.org/stable/std/ops/trait.Deref.html
+/// [`AsRef`]: https://doc.rust-lang.org/std/convert/trait.AsRef.html
+/// [`to_hex`]: #method.to_hex
+/// [`hex`]: https://crates.io/crates/hex
+#[derive(Clone, Copy, Hash)]
+pub struct Hash([u8; 32]);
+
+impl Hash {
+    /// The bytes of the `Hash`. Note that byte arrays don't provide
+    /// constant-time equality checking, so if  you need to compare hashes,
+    /// prefer the `Hash` type.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// The hexadecimal encoding of the `Hash`. The returned [`ArrayString`] is
+    /// a fixed size and doesn't allocate memory on the heap. Note that
+    /// [`ArrayString`] doesn't provide constant-time equality checking, so if
+    /// you need to compare hashes, prefer the `Hash` type.
+    ///
+    /// [`ArrayString`]: https://docs.rs/arrayvec/0.5.1/arrayvec/struct.ArrayString.html
+    pub fn to_hex(&self) -> ArrayString<[u8; 2 * 32]> {
+        let mut s = ArrayString::new();
+        let table = b"0123456789abcdef";
+        for &b in self.0.iter() {
+            s.push(table[(b >> 4) as usize] as char);
+            s.push(table[(b & 0xf) as usize] as char);
+        }
+        s
+    }
+}
+
+impl From<[u8; 32]> for Hash {
+    #[inline]
+    fn from(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+}
+
+impl From<Hash> for [u8; 32] {
+    #[inline]
+    fn from(hash: Hash) -> Self {
+        hash.0
+    }
+}
+
+/// This implementation is constant-time.
+impl PartialEq for Hash {
+    #[inline]
+    fn eq(&self, other: &Hash) -> bool {
+        constant_time_eq::constant_time_eq_32(&self.0, &other.0)
+    }
+}
+
+/// This implementation is constant-time.
+impl PartialEq<[u8; 32]> for Hash {
+    #[inline]
+    fn eq(&self, other: &[u8; 32]) -> bool {
+        constant_time_eq::constant_time_eq_32(&self.0, other)
+    }
+}
+
+impl Eq for Hash {}
+
+impl fmt::Debug for Hash {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Hash({})", self.to_hex())
     }
 }
 

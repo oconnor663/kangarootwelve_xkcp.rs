@@ -6,6 +6,8 @@ license-file = "LICENSE"
 edition = "2018"
 
 [dependencies]
+arrayvec = "0.5.1"
+constant_time_eq = "0.1.5"
 
 [dev-dependencies]
 hex = "0.4.2"
