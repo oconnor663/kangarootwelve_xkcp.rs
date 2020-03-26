@@ -9,7 +9,11 @@ sub-crate provides a command line interface.
 
 ## Building
 
-[in flux]
+`cargo install k12sum`
+
+This crate currently builds SIMD optimizations only on x86\_64 Linux.
+Windows and macOS are supported, but they build the slower "generic32"
+implementation. This should be fixable in a future version.
 
 ## License
 
