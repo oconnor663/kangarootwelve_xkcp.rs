@@ -8,12 +8,20 @@ fn main() {
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let k12_target;
-    if target_arch == "x86_64" && target_os == "linux" {
+    if target_arch == "x86_64" && target_os != "windows" {
         k12_target = "generic64";
         build.include("XKCP-K12/lib/Optimized64");
         build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
-        build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-AVX2.s");
-        build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-AVX512.s");
+
+        let mut asm_build = cc::Build::new();
+        asm_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-AVX2.s");
+        asm_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-AVX512.s");
+        if target_os == "macos" {
+            // see https://github.com/XKCP/K12/blob/b4f434574c501b1088468180feeeaab6117341e4/support/Build/ToTargetMakefile.xsl#L178
+            asm_build.flag("-xassembler-with-cpp");
+            asm_build.flag("-Wa,-defsym,macOS=1");
+        }
+        asm_build.compile("k12_asm");
 
         let mut ssse3_build = cc::Build::new();
         ssse3_build.flag("-mssse3");
