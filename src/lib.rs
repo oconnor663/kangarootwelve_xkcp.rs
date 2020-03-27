@@ -1,3 +1,36 @@
+//! A Rust wrapper around the [eXtended Keccak Code Package
+//! implementation](https://github.com/XKCP/K12) of the
+//! [KangarooTwelve](https://keccak.team/kangarootwelve.html) cryptographic
+//! hash function.
+//!
+//! # Examples
+//!
+//! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! // Hash an input all at once.
+//! let hash1 = kangarootwelve_xkcp::hash(b"foobarbaz");
+//!
+//! // Hash an input incrementally.
+//! let mut hasher = kangarootwelve_xkcp::Hasher::new();
+//! hasher.update(b"foo");
+//! hasher.update(b"bar");
+//! hasher.update(b"baz");
+//! let hash2 = hasher.finalize();
+//! assert_eq!(hash1, hash2);
+//!
+//! // Extended output. OutputReader also implements Read.
+//! # #[cfg(feature = "std")] {
+//! let mut hasher = kangarootwelve_xkcp::Hasher::new();
+//! hasher.update(b"foobarbaz");
+//! let mut output_reader = hasher.finalize_xof();
+//! let mut output = [0; 1000];
+//! output_reader.squeeze(&mut output);
+//! assert_eq!(&output[..32], hash1.as_bytes());
+//! # }
+//! # Ok(())
+//! # }
+//! ```
+
 // ffi_generic32.rs and ffi_generic64.rs are almost exactly the output from
 // bindgen. However, we need to manually insert some extra padding (see the XXX
 // comments), to work around https://github.com/rust-lang/rust-bindgen/issues/1753.
