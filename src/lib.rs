@@ -64,10 +64,34 @@ pub fn hash(input: &[u8]) -> Hash {
     hasher.finalize()
 }
 
+/// An incremental hash state that can accept any number of writes.
+///
+/// # Examples
+///
+/// ```
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// // Hash an input incrementally.
+/// let mut hasher = kangarootwelve_xkcp::Hasher::new();
+/// hasher.update(b"foo");
+/// hasher.update(b"bar");
+/// hasher.update(b"baz");
+/// assert_eq!(hasher.finalize(), kangarootwelve_xkcp::hash(b"foobarbaz"));
+///
+/// // Extended output. OutputReader also implements Read and Seek.
+/// # #[cfg(feature = "std")] {
+/// let mut output = [0; 1000];
+/// let mut output_reader = hasher.finalize_xof();
+/// output_reader.fill(&mut output);
+/// assert_eq!(&output[..32], kangarootwelve_xkcp::hash(b"foobarbaz").as_bytes());
+/// # }
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Clone)]
 pub struct Hasher(ffi::KangarooTwelve_Instance);
 
 impl Hasher {
+    /// Construct a new `Hasher` for the regular hash function.
     pub fn new() -> Self {
         let mut inner = MaybeUninit::uninit();
         let inner = unsafe {
@@ -90,6 +114,8 @@ impl Hasher {
         Self(inner)
     }
 
+    /// Add input bytes to the hash state. You can call this any number of
+    /// times, until the `Hasher` is finalized.
     pub fn update(&mut self, input: &[u8]) {
         assert_eq!(
             ffi::KCP_Phases_ABSORBING,
@@ -102,10 +128,22 @@ impl Hasher {
         }
     }
 
+    /// Finalize the hash state and return the [`Hash`](struct.Hash.html) of
+    /// the input. This method is equivalent to
+    /// [`finalize_custom`](#method.finalize_custom) with an empty
+    /// customization string.
+    ///
+    /// You can only finalize a `Hasher` once. Additional calls to any of the
+    /// finalize methods will panic.
     pub fn finalize(&mut self) -> Hash {
         self.finalize_custom(&[])
     }
 
+    /// Finalize the hash state using the given customization string and return
+    /// the [`Hash`](struct.Hash.html) of the input.
+    ///
+    /// You can only finalize a `Hasher` once. Additional calls to any of the
+    /// finalize methods will panic.
     pub fn finalize_custom(&mut self, customization: &[u8]) -> Hash {
         assert_eq!(
             ffi::KCP_Phases_ABSORBING,
@@ -127,10 +165,26 @@ impl Hasher {
         bytes.into()
     }
 
+    /// Finalize the hash state and return an [`OutputReader`], which can
+    /// supply any number of output bytes. This method is equivalent to
+    /// [`finalize_custom_xof`](#method.finalize_custom_xof) with an empty
+    /// customization string.
+    ///
+    /// You can only finalize a `Hasher` once. Additional calls to any of the
+    /// finalize methods will panic.
+    ///
+    /// [`OutputReader`]: struct.OutputReader.html
     pub fn finalize_xof(&mut self) -> OutputReader {
         self.finalize_custom_xof(&[])
     }
 
+    /// Finalize the hash state and return an [`OutputReader`], which can
+    /// supply any number of output bytes.
+    ///
+    /// You can only finalize a `Hasher` once. Additional calls to any of the
+    /// finalize methods will panic.
+    ///
+    /// [`OutputReader`]: struct.OutputReader.html
     pub fn finalize_custom_xof(&mut self, customization: &[u8]) -> OutputReader {
         assert_eq!(
             ffi::KCP_Phases_ABSORBING,
