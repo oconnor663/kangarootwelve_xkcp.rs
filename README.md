@@ -69,11 +69,11 @@ assert_eq!(&output[..32], hash1.as_bytes());
 
 ## Performance
 
-This crate currently builds SIMD optimizations only on x86\_64 Linux.
-Windows and macOS are supported, but they build the slower "generic32"
-implementation. If you're using this crate to compare benchmarks of
-different hash functions, you'll need to do it on x86\_64 Linux. This
-might change in a future version.
+The optimized SIMD implementation in this crate does not currently
+support Windows. Instead, for Windows targets, we build the "generic32"
+implementation, which is an order of magnitude slower. If you're using
+this crate for benchmarks, you'll need to do it on (x86\_64) Linux or
+macOS. This might change in a future version.
 
 ## License
 
