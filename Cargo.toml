@@ -1,9 +1,9 @@
 [package]
-name = "kangarootwelve-xkcp"
+name = "kangarootwelve_xkcp"
 version = "0.1.0"
 authors = ["Jack O'Connor <oconnor663@gmail.com>"]
 description = "An FFI wrapper for the XKCP implementation of the KangarooTwelve cryptographic hash function"
-repository = "https://github.com/oconnor663/kangarootwelve-xkcp.rs"
+repository = "https://github.com/oconnor663/kangarootwelve_xkcp.rs"
 license-file = "LICENSE"
 documentation = "https://docs.rs/kangarootwelve_xkcp"
 readme = "README.md"
