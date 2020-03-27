@@ -6,9 +6,8 @@ fn main() {
     build.file("XKCP-K12/lib/KangarooTwelve.c");
 
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let k12_target;
-    if target_arch == "x86_64" && target_os == "linux" {
+    if target_arch == "x86_64" {
         k12_target = "generic64";
         build.include("XKCP-K12/lib/Optimized64");
         build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
