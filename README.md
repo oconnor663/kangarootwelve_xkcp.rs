@@ -23,7 +23,7 @@ cargo install k12sum
 If `rustup` didn't configure your `PATH` for you, you might need to go
 looking for the installed binary in e.g. `~/.cargo/bin`. You can test
 out how fast KangarooTwelve is on your machine (but see the
-[Performance](#Performance) section below) by creating a big file and
+[Performance](#performance) section below) by creating a big file and
 hashing it, for example as follows:
 
 ```bash
@@ -63,13 +63,13 @@ output_reader.squeeze(&mut output);
 assert_eq!(&output[..32], hash1.as_bytes());
 ```
 
-## Building
-
-`cargo install k12sum`
+## Performance
 
 This crate currently builds SIMD optimizations only on x86\_64 Linux.
 Windows and macOS are supported, but they build the slower "generic32"
-implementation. This should be fixable in a future version.
+implementation. If you're using this crate to compare benchmarks of
+different hash functions, you'll need to do it on x86\_64 Linux. This
+might change in a future version.
 
 ## License
 
