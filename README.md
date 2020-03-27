@@ -59,7 +59,6 @@ let hash2 = hasher.finalize();
 assert_eq!(hash1, hash2);
 
 // Extended output. OutputReader also implements Read.
-# #[cfg(feature = "std")] {
 let mut hasher = kangarootwelve_xkcp::Hasher::new();
 hasher.update(b"foobarbaz");
 let mut output_reader = hasher.finalize_xof();
