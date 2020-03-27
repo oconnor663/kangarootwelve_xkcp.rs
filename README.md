@@ -7,22 +7,27 @@ hash function. That implementation includes SSSE3, AVX2, and AVX-512
 optimizations, and it detects processor support at runtime. The `k12sum`
 sub-crate provides a command line interface.
 
+This package wraps C code via FFI, so you have to have a C compiler
+installed to build it.
+
 ## Usage
 
-### `k12sum`
+### The `k12sum` command line utility
 
-The `k12sum` command line utility allows you to hash files and data from
-standard input using KangarooTwelve. To install it, first [install Rust
-and Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html),
-and then run:
+`k12sum` hashes files or data from standard input using KangarooTwelve.
+To install it:
 
-```bash
-cargo install k12sum
-```
+1. Make sure you have a working C compiler. On Linux and macOS, you can
+   run `gcc --version` to check that GCC is installed. On Windows, if
+   you don't already have Visual Studio installed, you can install the
+   [C++ Build Tools for Visual Studio
+   2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019).
+2. [Install Rust and Cargo.](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+3. Run `cargo install k12sum`.
 
 If `rustup` didn't configure your `PATH` for you, you might need to go
 looking for the installed binary in e.g. `~/.cargo/bin`. You can test
-out how fast KangarooTwelve is on your machine (but see the
+out how fast KangarooTwelve is on your machine (however see the
 [Performance](#performance) section below) by creating a big file and
 hashing it, for example as follows:
 
@@ -35,11 +40,11 @@ time openssl sha256 /tmp/bigfile
 time k12sum /tmp/bigfile
 ```
 
-### The `kangarootwelve_xkcp` crate
+### The `kangarootwelve_xkcp` Rust crate
 
 To use KangarooTwelve from Rust code, add a dependency on the
 `kangarootwelve_xkcp` crate to your `Cargo.toml`. Here's an example of
-hashing some input bytes:
+hashing some bytes:
 
 ```rust
 // Hash an input all at once.
