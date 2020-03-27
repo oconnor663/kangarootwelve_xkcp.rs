@@ -56,8 +56,13 @@ use arrayvec::ArrayString;
 use std::fmt;
 use std::mem::MaybeUninit;
 
+/// The number of bytes hashed or output per block.
 pub const RATE: usize = 168; // (1600 - 256) / 8
 
+/// Hash a slice of bytes all at once. For multiple writes, the optional
+/// customization string, or extended output bytes, see [`Hasher`].
+///
+/// [`Hasher`]: struct.Hasher.html
 pub fn hash(input: &[u8]) -> Hash {
     let mut hasher = Hasher::new();
     hasher.update(input);
