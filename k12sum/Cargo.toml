@@ -1,6 +1,6 @@
 [package]
 name = "k12sum"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Jack O'Connor <oconnor663@gmail.com>"]
 description = "A command line implementation of the KangarooTwelve hash function"
 repository = "https://github.com/oconnor663/kangarootwelve_xkcp.rs"
