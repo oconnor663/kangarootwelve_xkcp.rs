@@ -1,3 +1,9 @@
+//! NOTE: This build does *not* use the upstream makefile system. Instead, it
+//! executes the C compiler directly, via the `cc` crate. That avoids taking
+//! build dependencies on make and xsltproc, which would be problematic on
+//! Windows. However, it does mean that we'll need to be careful to track build
+//! changes when we re-vendor upstream code.
+
 use std::env;
 
 fn main() {
