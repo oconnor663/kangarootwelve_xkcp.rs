@@ -66,6 +66,16 @@ pub struct KangarooTwelve_InstanceStruct {
     pub queueAbsorbedLen: usize,
     pub phase: ::std::os::raw::c_int,
 }
+
+fn bump_offset_to_align<T>(offset: usize) -> usize {
+    let alignment = std::mem::align_of::<T>();
+    if offset % alignment == 0 {
+        offset
+    } else {
+        offset + alignment - (offset % alignment)
+    }
+}
+
 // XXX: This 32-bit implementation does run on some 64-bit systems (currently
 // all Windows and non-x86 targets), so we have to manually tweak it to account
 // for usize.
@@ -73,7 +83,7 @@ pub struct KangarooTwelve_InstanceStruct {
 fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
     assert_eq!(
         ::std::mem::size_of::<KangarooTwelve_InstanceStruct>(),
-        404 + 4 * ::std::mem::size_of::<usize>(),
+        bump_offset_to_align::<usize>(404) + 4 * ::std::mem::size_of::<usize>(),
         concat!("Size of: ", stringify!(KangarooTwelve_InstanceStruct))
     );
     assert_eq!(
@@ -110,7 +120,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).fixedOutputLength as *const _
                 as usize
         },
-        404usize,
+        bump_offset_to_align::<usize>(404),
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -123,7 +133,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).blockNumber as *const _
                 as usize
         },
-        404 + 1 * ::std::mem::size_of::<usize>(),
+        bump_offset_to_align::<usize>(404) + 1 * ::std::mem::size_of::<usize>(),
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -136,7 +146,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).queueAbsorbedLen as *const _
                 as usize
         },
-        404 + 2 * ::std::mem::size_of::<usize>(),
+        bump_offset_to_align::<usize>(404) + 2 * ::std::mem::size_of::<usize>(),
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -148,7 +158,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
         unsafe {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).phase as *const _ as usize
         },
-        404 + 3 * ::std::mem::size_of::<usize>(),
+        bump_offset_to_align::<usize>(404) + 3 * ::std::mem::size_of::<usize>(),
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
