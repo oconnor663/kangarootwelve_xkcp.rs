@@ -108,12 +108,7 @@ impl Hasher {
         debug_assert_eq!(0, inner.fixedOutputLength);
         debug_assert_eq!(0, inner.blockNumber);
         debug_assert_eq!(0, inner.queueAbsorbedLen);
-        debug_assert_eq!(ffi::KCP_Phases_ABSORBING, inner.phase);
-        // Go ahead and use these three so that they're not dead code.
-        debug_assert!(ffi::KCP_Phases_NOT_INITIALIZED != inner.phase);
-        debug_assert!(ffi::KCP_Phases_FINAL != inner.phase);
-        debug_assert!(ffi::KCP_Phases_SQUEEZING != inner.phase);
-        debug_assert_eq!(1600 - 256, inner.finalNode.rate);
+        debug_assert_eq!(inner.phase, 1);
         debug_assert_eq!(0, inner.finalNode.byteIOIndex);
         debug_assert_eq!(0, inner.finalNode.squeezing);
         Self(inner)
@@ -122,11 +117,7 @@ impl Hasher {
     /// Add input bytes to the hash state. You can call this any number of
     /// times, until the `Hasher` is finalized.
     pub fn update(&mut self, input: &[u8]) {
-        assert_eq!(
-            ffi::KCP_Phases_ABSORBING,
-            self.0.phase,
-            "this instance has already been finalized"
-        );
+        assert_eq!(self.0.phase, 1, "this instance has already been finalized");
         unsafe {
             let ret = ffi::KangarooTwelve_Update(&mut self.0, input.as_ptr(), input.len());
             debug_assert_eq!(0, ret);
@@ -150,11 +141,7 @@ impl Hasher {
     /// You can only finalize a `Hasher` once. Additional calls to any of the
     /// finalize methods will panic.
     pub fn finalize_custom(&mut self, customization: &[u8]) -> Hash {
-        assert_eq!(
-            ffi::KCP_Phases_ABSORBING,
-            self.0.phase,
-            "this instance has already been finalized"
-        );
+        assert_eq!(self.0.phase, 1, "this instance has already been finalized");
         let mut bytes = [0; 32];
         unsafe {
             let ret = ffi::KangarooTwelve_Final(
@@ -191,11 +178,7 @@ impl Hasher {
     ///
     /// [`OutputReader`]: struct.OutputReader.html
     pub fn finalize_custom_xof(&mut self, customization: &[u8]) -> OutputReader {
-        assert_eq!(
-            ffi::KCP_Phases_ABSORBING,
-            self.0.phase,
-            "this instance has already been finalized"
-        );
+        assert_eq!(self.0.phase, 1, "this instance has already been finalized");
         unsafe {
             let ret = ffi::KangarooTwelve_Final(
                 &mut self.0,
@@ -336,11 +319,7 @@ impl OutputReader {
     ///
     /// [`Read::read`]: #method.read
     pub fn squeeze(&mut self, buf: &mut [u8]) {
-        debug_assert_eq!(
-            ffi::KCP_Phases_SQUEEZING,
-            self.0.phase,
-            "this instance has not yet been finalized"
-        );
+        debug_assert_eq!(self.0.phase, 3, "this instance has not yet been finalized");
         unsafe {
             let ret = ffi::KangarooTwelve_Squeeze(&mut self.0, buf.as_mut_ptr(), buf.len());
             debug_assert_eq!(0, ret);
