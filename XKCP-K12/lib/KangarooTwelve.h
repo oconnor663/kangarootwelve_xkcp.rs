@@ -1,7 +1,12 @@
 /*
-Implementation by Ronny Van Keer, hereby denoted as "the implementer".
+K12 based on the eXtended Keccak Code Package (XKCP)
+https://github.com/XKCP/XKCP
 
-For more information, feedback or questions, please refer to our website:
+KangarooTwelve, designed by Guido Bertoni, Joan Daemen, Michaël Peeters, Gilles Van Assche, Ronny Van Keer and Benoît Viguier.
+
+Implementation by Gilles Van Assche and Ronny Van Keer, hereby denoted as "the implementer".
+
+For more information, feedback or questions, please refer to the Keccak Team website:
 https://keccak.team/
 
 To the extent possible under law, the implementer has waived all copyright
@@ -13,44 +18,21 @@ http://creativecommons.org/publicdomain/zero/1.0/
 #define _KangarooTwelve_h_
 
 #include <stddef.h>
-#include "KeccakP-1600-SnP.h"
+#include <stdint.h>
 
-#ifdef ALIGN
-#undef ALIGN
-#endif
+typedef struct KangarooTwelve_FStruct {
+    uint8_t state[200];
+    uint8_t byteIOIndex;
+    uint8_t squeezing;
+} KangarooTwelve_F;
 
-#if defined(__GNUC__)
-#define ALIGN(x) __attribute__ ((aligned(x)))
-#elif defined(_MSC_VER)
-#define ALIGN(x) __declspec(align(x))
-#elif defined(__ARMCC_VERSION)
-#define ALIGN(x) __align(x)
-#else
-#define ALIGN(x)
-#endif
-
-ALIGN(KeccakP1600_stateAlignment) typedef struct KeccakWidth1600_12rounds_SpongeInstanceStruct {
-    unsigned char state[KeccakP1600_stateSizeInBytes];
-    unsigned int rate;
-    unsigned int byteIOIndex;
-    int squeezing;
-} KeccakWidth1600_12rounds_SpongeInstance;
-
-typedef enum {
-    NOT_INITIALIZED,
-    ABSORBING,
-    FINAL,
-    SQUEEZING
-} KCP_Phases;
-typedef KCP_Phases KangarooTwelve_Phases;
-
-typedef struct {
-    KeccakWidth1600_12rounds_SpongeInstance queueNode;
-    KeccakWidth1600_12rounds_SpongeInstance finalNode;
+typedef struct KangarooTwelve_InstanceStruct {
+    KangarooTwelve_F queueNode;
+    KangarooTwelve_F finalNode;
     size_t fixedOutputLength;
     size_t blockNumber;
-    unsigned int queueAbsorbedLen;
-    KangarooTwelve_Phases phase;
+    size_t queueAbsorbedLen;
+    int phase;
 } KangarooTwelve_Instance;
 
 /** Extendable ouput function KangarooTwelve.

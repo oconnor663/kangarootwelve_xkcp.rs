@@ -1,7 +1,12 @@
 /*
-Implementation by Ronny Van Keer, hereby denoted as "the implementer".
+K12 based on the eXtended Keccak Code Package (XKCP)
+https://github.com/XKCP/XKCP
 
-For more information, feedback or questions, please refer to our website:
+KangarooTwelve, designed by Guido Bertoni, Joan Daemen, Michaël Peeters, Gilles Van Assche, Ronny Van Keer and Benoît Viguier.
+
+Implementation by Gilles Van Assche and Ronny Van Keer, hereby denoted as "the implementer".
+
+For more information, feedback or questions, please refer to the Keccak Team website:
 https://keccak.team/
 
 To the extent possible under law, the implementer has waived all copyright
@@ -10,6 +15,7 @@ http://creativecommons.org/publicdomain/zero/1.0/
 */
 
 #include "KangarooTwelve.h"
+#include "KeccakP-1600-SnP.h"
 
 /* #define OUTPUT */
 /* #define VERBOSE */
@@ -24,6 +30,7 @@ http://creativecommons.org/publicdomain/zero/1.0/
 #if (defined(OUTPUT) || defined(VERBOSE) || !defined(EMBEDDED))
 #include <stdio.h>
 #endif
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -98,7 +105,7 @@ static void performTestKangarooTwelveOneInput(unsigned int inputLen, unsigned in
             assert(result == 0);
             while (inputLen)
             {
-                unsigned int len = ((rand() << 15) ^ rand()) % (inputLen + 1);
+                unsigned int len = ((rand() * 32768) + rand()) % (inputLen + 1);
                 result = KangarooTwelve_Update(&kt, pInput, len);
                 assert(result == 0);
                 pInput += len;
@@ -188,13 +195,15 @@ static void performTestKangarooTwelve(unsigned char *checksum, unsigned int mode
     KangarooTwelve_Instance spongeChecksum;
     KangarooTwelve_Initialize(&spongeChecksum, 0);
 
-    outputLen = 256/8;
-    customLen = 0;
-    for(inputLen=0; inputLen<=cChunkSize*9+123; inputLen++) {
-        assert(inputLen <= inputByteSize);
-        performTestKangarooTwelveOneInput(inputLen, outputLen, customLen, &spongeChecksum, mode, useSqueeze);
+    if (mode != 1) {
+        outputLen = 256/8;
+        customLen = 0;
+        for(inputLen=0; inputLen<=cChunkSize*9+123; inputLen += (useSqueeze ? 23 : (((mode == 2) && (inputLen >= cChunkSize*2)) ? 32 : 1))) {
+            assert(inputLen <= inputByteSize);
+            performTestKangarooTwelveOneInput(inputLen, outputLen, customLen, &spongeChecksum, mode, useSqueeze);
+        }
     }
-    
+
     for(outputLen = 128/8; outputLen <= 512/8; outputLen <<= 1)
     for(inputLen = 0; inputLen <= (3*cChunkSize) && inputLen <= inputByteSize; inputLen = inputLen ? (inputLen + 167) : 1)
     for(customLen = 0; customLen <= customizationByteSize; customLen += 7) 
@@ -217,23 +226,35 @@ static void performTestKangarooTwelve(unsigned char *checksum, unsigned int mode
     #endif
 }
 
-void selfTestKangarooTwelve(const unsigned char *expected)
+void selfTestKangarooTwelve()
 {
+    const unsigned char* expected[6] = {
+        (const unsigned char*)"\x61\x4d\x7a\xf8\xd5\xcc\xd0\xe1\x02\x53\x7d\x21\x5e\x39\x05\xed",
+        (const unsigned char*)"\x60\x9c\x95\xbe\xce\xdc\xcd\x58\x43\xf2\x4d\xdf\x15\xf3\x91\xdb",
+        (const unsigned char*)"\xcb\x8d\x23\xf4\xbd\xfc\x2a\x5a\x27\xb1\x6a\xfa\x65\x3a\x76\xbe",
+        (const unsigned char*)"\x5a\xac\xd7\x2d\x46\x7a\x4f\xa6\xf3\xc2\xa8\xe6\x10\x02\x8d\xc5",
+        (const unsigned char*)"\x60\x9c\x95\xbe\xce\xdc\xcd\x58\x43\xf2\x4d\xdf\x15\xf3\x91\xdb",
+        (const unsigned char*)"\x5a\xac\xd7\x2d\x46\x7a\x4f\xa6\xf3\xc2\xa8\xe6\x10\x02\x8d\xc5",
+    };
     unsigned char checksum[checksumByteSize];
     unsigned int mode, useSqueeze;
 
+    #ifndef EMBEDDED
+    printf("Testing KangarooTwelve ");
+    fflush(stdout);
+    #endif
     for(useSqueeze = 0; useSqueeze <= 1; ++useSqueeze)
     for(mode = 0; mode <= 2; ++mode) {
         #ifndef EMBEDDED
-        printf("Testing KangarooTwelve %u %u...", useSqueeze, mode);
+        printf(".");
         fflush(stdout);
         #endif
         performTestKangarooTwelve(checksum, mode, useSqueeze);
-        assert(memcmp(expected, checksum, checksumByteSize) == 0);
-        #ifndef EMBEDDED
-        printf(" - OK.\n");
-        #endif
+        assert(memcmp(expected[useSqueeze*3 + mode], checksum, checksumByteSize) == 0);
     }
+    #ifndef EMBEDDED
+    printf("\n   - OK.\n");
+    #endif
 }
 
 #ifdef OUTPUT
@@ -307,13 +328,42 @@ void printKangarooTwelveTestVectors()
     }
 }
 
+#ifndef KeccakP1600_disableParallelism
+void testKangarooTwelveWithChangingCpuFeatures()
+{
+    uint8_t M[289];
+    uint8_t output[32];
+    const size_t l = 289;
+    const uint8_t expected[32] = {
+        0x0c, 0x31, 0x5e, 0xbc, 0xde, 0xdb, 0xf6, 0x14, 0x26, 0xde, 0x7d, 0xcf, 0x8f, 0xb7, 0x25, 0xd1,
+        0xe7, 0x46, 0x75, 0xd7, 0xf5, 0x32, 0x7a, 0x50, 0x67, 0xf3, 0x67, 0xb1, 0x08, 0xec, 0xb6, 0x7c };
+    KangarooTwelve_Instance k12;
+
+    printf("\n * Testing KangarooTwelve interleaved with changing CPU features\n");
+    for(size_t j=0; j<l; j++)
+        M[j] = j%251;
+    KangarooTwelve_Initialize(&k12, 32);
+    for(size_t j=0; j<l; j++) {
+        // Pseudo-randomly switch on/off the CPU features
+        uint8_t features = expected[j % 32] ^ M[j];
+        KangarooTwelve_EnableAllCpuFeatures();
+        if (features & 1) KangarooTwelve_DisableAVX512();
+        if (features & 2) KangarooTwelve_DisableAVX2();
+        if (features & 4) KangarooTwelve_DisableSSSE3();
+        KangarooTwelve_Update(&k12, &M[j], 1);
+    }
+    KangarooTwelve_Final(&k12, output, "", 0);
+    assert(memcmp(expected, output, 32) == 0);
+    printf("   - OK\n");
+}
+#endif
+
 void testKangarooTwelve(void)
 {
 #ifdef OUTPUT
     printKangarooTwelveTestVectors();
     writeTestKangarooTwelve("KangarooTwelve.txt");
 #endif
-    const unsigned char* checksum = (const unsigned char*)"\x61\x4d\x7a\xf8\xd5\xcc\xd0\xe1\x02\x53\x7d\x21\x5e\x39\x05\xed";
 
 #ifndef KeccakP1600_disableParallelism
     // Read feature availability
@@ -323,31 +373,34 @@ void testKangarooTwelve(void)
     int cpu_has_SSSE3 = KangarooTwelve_DisableSSSE3();
 
     // Test without vectorization
-    printf(" - Testing without vectorization:\n");
+    printf(" * Testing without vectorization:\n");
 #endif
-    selfTestKangarooTwelve(checksum);
+    selfTestKangarooTwelve();
 
 #ifndef KeccakP1600_disableParallelism
     // Test with SSSE3 only if it's available
     if (cpu_has_SSSE3) {
-        printf("\n - Testing with SSSE3 enabled:\n");
+        printf("\n * Testing with SSSE3 enabled:\n");
         KangarooTwelve_EnableAllCpuFeatures();
         KangarooTwelve_DisableAVX512();
         KangarooTwelve_DisableAVX2();
-        selfTestKangarooTwelve(checksum);
+        selfTestKangarooTwelve();
     }
     // Test with SSSE3 and AVX2 if they're available
     if (cpu_has_AVX2) {
-        printf("\n - Testing with AVX2 enabled:\n");
+        printf("\n * Testing with AVX2 enabled:\n");
         KangarooTwelve_EnableAllCpuFeatures();
         KangarooTwelve_DisableAVX512();
-        selfTestKangarooTwelve(checksum);
+        selfTestKangarooTwelve();
     }
     // Finally, test with everything enabled if we have AVX512
     if (cpu_has_AVX512) {
-        printf("\n - Testing with AVX512 enabled:\n");
+        printf("\n * Testing with AVX512 enabled:\n");
         KangarooTwelve_EnableAllCpuFeatures();
-        selfTestKangarooTwelve(checksum);
+        selfTestKangarooTwelve();
     }
+
+    // Test with changing features
+    testKangarooTwelveWithChangingCpuFeatures();
 #endif
 }
