@@ -36,14 +36,20 @@
 // comments), to work around https://github.com/rust-lang/rust-bindgen/issues/1753.
 // Be careful to preserve this tweak when regenerating these files, until that
 // issue is fixed.
-#[cfg(k12_target = "generic64")]
-#[path = "ffi_generic64.rs"]
+#[cfg(k12_bindings = "optimized64")]
+#[path = "ffi_optimized64.rs"]
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
 mod ffi;
-#[cfg(k12_target = "generic32")]
-#[path = "ffi_generic32.rs"]
+#[cfg(k12_bindings = "plain64")]
+#[path = "ffi_plain64.rs"]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+mod ffi;
+#[cfg(k12_bindings = "inplace32bi")]
+#[path = "ffi_inplace32bi.rs"]
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
