@@ -21,30 +21,17 @@ Please refer to the XKCP for more details.
 #include <stdint.h>
 #include <tmmintrin.h>
 #include "KeccakP-1600-SnP.h"
+#include "align.h"
 
 #define KeccakP1600times2_SSSE3_unrolling 2
-
-#ifdef ALIGN
-#undef ALIGN
-#endif
-
-#if defined(__GNUC__)
-#define ALIGN(x) __attribute__ ((aligned(x)))
-#elif defined(_MSC_VER)
-#define ALIGN(x) __declspec(align(x))
-#elif defined(__ARMCC_VERSION)
-#define ALIGN(x) __align(x)
-#else
-#define ALIGN(x)
-#endif
 
 #define SSSE3alignment 16
 
 #define ANDnu128(a, b)      _mm_andnot_si128(a, b)
 #define CONST128(a)         _mm_load_si128((const __m128i *)&(a))
 #define LOAD128(a)          _mm_load_si128((const __m128i *)&(a))
-#define LOAD6464(a, b)      _mm_set_epi64((__m64)(a), (__m64)(b))
-#define CONST128_64(a)      _mm_set1_epi64((__m64)(a))
+#define LOAD6464(a, b)      _mm_set_epi64x(a, b)
+#define CONST128_64(a)      _mm_set1_epi64x(a)
 #define ROL64in128(a, o)    _mm_or_si128(_mm_slli_epi64(a, o), _mm_srli_epi64(a, 64-(o)))
 #define ROL64in128_8(a)     _mm_shuffle_epi8(a, CONST128(rho8))
 #define ROL64in128_56(a)    _mm_shuffle_epi8(a, CONST128(rho56))

@@ -1,4 +1,4 @@
-# kangarootwelve_xkcp.rs [![Actions Status](https://github.com/oconnor663/kangarootwelve_xkcp.rs/workflows/tests/badge.svg)](https://github.com/oconnor663/kangarootwelve_xkcp.rs/actions) [![docs.rs](https://docs.rs/kangarootwelve_xkcp/badge.svg)](https://docs.rs/kangarootwelve_xkcp) [![crates.io](https://img.shields.io/crates/v/kangarootwelve_xkcp.svg)](https://crates.io/crates/kangarootwelve_xkcp)
+ kangarootwelve_xkcp.rs [![Actions Status](https://github.com/oconnor663/kangarootwelve_xkcp.rs/workflows/tests/badge.svg)](https://github.com/oconnor663/kangarootwelve_xkcp.rs/actions) [![docs.rs](https://docs.rs/kangarootwelve_xkcp/badge.svg)](https://docs.rs/kangarootwelve_xkcp) [![crates.io](https://img.shields.io/crates/v/kangarootwelve_xkcp.svg)](https://crates.io/crates/kangarootwelve_xkcp)
 
 A Rust wrapper around the [eXtended Keccak Code Package
 implementation](https://github.com/XKCP/K12) of the
