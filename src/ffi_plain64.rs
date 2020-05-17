@@ -63,7 +63,7 @@ pub struct KangarooTwelve_InstanceStruct {
     pub finalNode: KangarooTwelve_F,
     pub fixedOutputLength: usize,
     pub blockNumber: usize,
-    pub queueAbsorbedLen: usize,
+    pub queueAbsorbedLen: ::std::os::raw::c_uint,
     pub phase: ::std::os::raw::c_int,
 }
 #[test]
@@ -94,7 +94,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
         unsafe {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).finalNode as *const _ as usize
         },
-        202usize,
+        208usize,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -107,7 +107,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).fixedOutputLength as *const _
                 as usize
         },
-        408usize,
+        416usize,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -120,7 +120,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).blockNumber as *const _
                 as usize
         },
-        416usize,
+        424usize,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -133,7 +133,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).queueAbsorbedLen as *const _
                 as usize
         },
-        424usize,
+        432usize,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -145,7 +145,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
         unsafe {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).phase as *const _ as usize
         },
-        432usize,
+        436usize,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
