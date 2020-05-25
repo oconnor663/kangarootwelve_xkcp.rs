@@ -2,11 +2,13 @@
 
 pub type __uint8_t = ::std::os::raw::c_uchar;
 
-// XXX: In C, this type's size is not a multiple of its alignment. That's
-// difficult or impossible for bindgen to represent in Rust, and it leads to a
-// padding workaround below in KangarooTwelve_Instance. For more details, see
+// XXX: In C under GCC and Clang (but not MSVC!), this type's size is not a
+// multiple of its alignment. That's difficult or impossible for bindgen to
+// represent in Rust, and it leads to a padding workaround below in
+// KangarooTwelve_Instance. For more details, see
 // https://github.com/rust-lang/rust-bindgen/issues/1753.
 #[repr(C)]
+#[cfg_attr(target_env = "msvc", repr(align(64)))]
 #[derive(Copy, Clone)]
 pub struct KangarooTwelve_FStruct {
     pub state: [u8; 200usize],
@@ -15,19 +17,22 @@ pub struct KangarooTwelve_FStruct {
 }
 #[test]
 fn bindgen_test_layout_KangarooTwelve_FStruct() {
+    // XXX: The queueNode and finalNode "overlap" under GCC and Clang, but not MSVC!
+    let fstruct_size = if cfg!(target_env = "msvc") { 256 } else { 202 };
     assert_eq!(
         ::std::mem::size_of::<KangarooTwelve_FStruct>(),
-        202usize,
+        fstruct_size,
         concat!("Size of: ", stringify!(KangarooTwelve_FStruct))
     );
-    // XXX: This test will pass, but what it's testing for is wrong. This
-    // struct should have an alignment of 64. See the comment above the struct
-    // definition. We can get away with this because this struct isn't public.
-    // It's only used in KangarooTwelve_InstanceStruct, where we manually pad
-    // it to the correct alignment.
+    // XXX: This test will pass, but (on GCC and Clang) what it's testing for
+    // is wrong. This struct should have an alignment of 64. See the comment
+    // above the struct definition. We can get away with this because this
+    // struct isn't public. It's only used in KangarooTwelve_InstanceStruct,
+    // where we manually pad it to the correct alignment.
+    let fstruct_align = if cfg!(target_env = "msvc") { 64 } else { 1 };
     assert_eq!(
         ::std::mem::align_of::<KangarooTwelve_FStruct>(),
-        1usize,
+        fstruct_align,
         concat!("Alignment of ", stringify!(KangarooTwelve_FStruct))
     );
     assert_eq!(
@@ -71,8 +76,10 @@ pub type KangarooTwelve_F = KangarooTwelve_FStruct;
 #[derive(Copy, Clone)]
 pub struct KangarooTwelve_InstanceStruct {
     pub queueNode: KangarooTwelve_F,
-    // XXX: Bindgen doesn't currently generate this padding correctly. See
+    // XXX: Bindgen doesn't currently generate this padding correctly for GCC
+    // and Clang (but not MSVC!). See
     // https://github.com/rust-lang/rust-bindgen/issues/1753 for details.
+    #[cfg(not(target_env = "msvc"))]
     _padding: [u8; 54],
     pub finalNode: KangarooTwelve_F,
     pub fixedOutputLength: usize,
@@ -82,9 +89,11 @@ pub struct KangarooTwelve_InstanceStruct {
 }
 #[test]
 fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
+    // XXX: The queueNode and finalNode "overlap" under GCC and Clang, but not MSVC!
+    let instancestruct_size = if cfg!(target_env = "msvc") { 576 } else { 512 };
     assert_eq!(
         ::std::mem::size_of::<KangarooTwelve_InstanceStruct>(),
-        512usize,
+        instancestruct_size,
         concat!("Size of: ", stringify!(KangarooTwelve_InstanceStruct))
     );
     assert_eq!(
@@ -116,12 +125,14 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
             stringify!(finalNode)
         )
     );
+    // XXX: The queueNode and finalNode "overlap" under GCC and Clang, but not MSVC!
+    let fields_start = if cfg!(target_env = "msvc") { 512 } else { 464 };
     assert_eq!(
         unsafe {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).fixedOutputLength as *const _
                 as usize
         },
-        464usize,
+        fields_start + 0,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -134,7 +145,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).blockNumber as *const _
                 as usize
         },
-        472usize,
+        fields_start + 8,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -147,7 +158,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).queueAbsorbedLen as *const _
                 as usize
         },
-        480usize,
+        fields_start + 16,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
@@ -159,7 +170,7 @@ fn bindgen_test_layout_KangarooTwelve_InstanceStruct() {
         unsafe {
             &(*(::std::ptr::null::<KangarooTwelve_InstanceStruct>())).phase as *const _ as usize
         },
-        484usize,
+        fields_start + 20,
         concat!(
             "Offset of field: ",
             stringify!(KangarooTwelve_InstanceStruct),
