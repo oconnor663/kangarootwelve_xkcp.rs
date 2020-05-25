@@ -1,13 +1,14 @@
 [package]
 name = "kangarootwelve_xkcp"
 version = "0.1.1"
+edition = "2018"
 authors = ["Jack O'Connor <oconnor663@gmail.com>"]
 description = "An FFI wrapper for the XKCP implementation of the KangarooTwelve hash function"
 repository = "https://github.com/oconnor663/kangarootwelve_xkcp.rs"
 license-file = "LICENSE"
 documentation = "https://docs.rs/kangarootwelve_xkcp"
 readme = "README.md"
-edition = "2018"
+keywords = ["kangarootwelve", "k12"]
 
 [dependencies]
 arrayvec = "0.5.1"
