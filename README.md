@@ -1,4 +1,4 @@
- kangarootwelve_xkcp.rs [![Actions Status](https://github.com/oconnor663/kangarootwelve_xkcp.rs/workflows/tests/badge.svg)](https://github.com/oconnor663/kangarootwelve_xkcp.rs/actions) [![docs.rs](https://docs.rs/kangarootwelve_xkcp/badge.svg)](https://docs.rs/kangarootwelve_xkcp) [![crates.io](https://img.shields.io/crates/v/kangarootwelve_xkcp.svg)](https://crates.io/crates/kangarootwelve_xkcp)
+# kangarootwelve_xkcp.rs [![Actions Status](https://github.com/oconnor663/kangarootwelve_xkcp.rs/workflows/tests/badge.svg)](https://github.com/oconnor663/kangarootwelve_xkcp.rs/actions) [![docs.rs](https://docs.rs/kangarootwelve_xkcp/badge.svg)](https://docs.rs/kangarootwelve_xkcp) [![crates.io](https://img.shields.io/crates/v/kangarootwelve_xkcp.svg)](https://crates.io/crates/kangarootwelve_xkcp)
 
 A Rust wrapper around the [eXtended Keccak Code Package
 implementation](https://github.com/XKCP/K12) of the
@@ -15,7 +15,12 @@ installed to build it.
 ### The `k12sum` command line utility
 
 `k12sum` hashes files or data from standard input using KangarooTwelve.
-To install it:
+Prebuilt binaries are available for Linux, Windows, and macOS (requiring
+the [unidentified developer
+workaround](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac))
+on the [releases page](https://github.com/oconnor663/kangarootwelve_xkcp.rs/releases).
+
+To build `k12sum` yourself:
 
 1. Make sure you have a working C compiler. On Linux and macOS, you can
    run `gcc --version` to check that GCC is installed. On Windows, if
