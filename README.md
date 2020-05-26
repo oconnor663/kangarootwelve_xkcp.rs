@@ -72,14 +72,6 @@ output_reader.squeeze(&mut output);
 assert_eq!(&output[..32], hash1.as_bytes());
 ```
 
-## Performance
-
-The optimized SIMD implementation in this crate does not currently
-support Windows. Instead, for Windows targets, we build the "generic32"
-implementation, which is an order of magnitude slower. If you're using
-this crate for benchmarks, you'll need to do it on (x86\_64) Linux or
-macOS. This might change in a future version.
-
 ## License
 
 The Rust wrapping code in this project is released into the public
