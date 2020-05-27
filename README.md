@@ -23,18 +23,17 @@ on the [releases page](https://github.com/oconnor663/kangarootwelve_xkcp.rs/rele
 To build `k12sum` yourself:
 
 1. Make sure you have a working C compiler. On Linux and macOS, you can
-   run `gcc --version` to check that GCC is installed. On Windows, if
-   you don't already have Visual Studio installed, you can install the
-   [C++ Build Tools for Visual Studio
+   run `gcc --version` to check that GCC (or Clang pretending to be GCC)
+   is installed. On Windows, if you don't already have Visual Studio
+   installed, you can install the [C++ Build Tools for Visual Studio
    2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019).
 2. [Install Rust and Cargo.](https://doc.rust-lang.org/cargo/getting-started/installation.html)
 3. Run `cargo install k12sum`.
 
 If `rustup` didn't configure your `PATH` for you, you might need to go
 looking for the installed binary in e.g. `~/.cargo/bin`. You can test
-out how fast KangarooTwelve is on your machine (however see the
-[Performance](#performance) section below) by creating a big file and
-hashing it, for example as follows:
+out how fast KangarooTwelve is on your machine by creating a big file
+and hashing it, for example as follows:
 
 ```bash
 # Create a 1 GB file.
