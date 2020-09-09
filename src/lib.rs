@@ -26,6 +26,9 @@
 //! let mut output = [0; 1000];
 //! output_reader.squeeze(&mut output);
 //! assert_eq!(&output[..32], hash1.as_bytes());
+//!
+//! // Print a hash as hex.
+//! println!("{}", hash1.to_hex());
 //! # }
 //! # Ok(())
 //! # }
