@@ -103,3 +103,17 @@ fn bench_0512_kib(b: &mut Bencher) {
 fn bench_1024_kib(b: &mut Bencher) {
     bench_atonce(b, 1024 * KIB);
 }
+
+#[bench]
+fn bench_1024_kib_k12(b: &mut Bencher) {
+    let mut input = RandomInput::new(b, 1024 * KIB);
+    b.iter(|| {
+        use digest::{ExtendableOutputDirty, Update, XofReader};
+        let mut state = k12::KangarooTwelve::new();
+        state.update(input.get());
+        let mut reader = state.finalize_xof_dirty();
+        let mut output = [0; 32];
+        reader.read(&mut output);
+        output
+    });
+}

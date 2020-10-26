@@ -41,13 +41,21 @@ fn k12_hex(input: &[u8], customization: &[u8], num_output_bytes: usize) -> Strin
         .squeeze(&mut output2);
     assert_eq!(output, output2);
 
-    // And finally, check that the all-at-once function gives the same
-    // answer too.
+    // Check that the all-at-once function gives the same answer too.
     if customization.is_empty() {
         let hash3 = hash(input);
         let compare_len = std::cmp::min(hash3.as_bytes().len(), num_output_bytes);
         assert_eq!(&hash3.as_bytes()[..compare_len], &output[..compare_len]);
     }
+
+    // Finally, check that the `k12` crate gives the same answer too.
+    use digest::{ExtendableOutputDirty, Update, XofReader};
+    let mut k12_state = k12::KangarooTwelve::new_with_customization(customization);
+    k12_state.update(input);
+    let mut k12_reader = k12_state.finalize_xof_dirty();
+    let mut k12_output = vec![0; num_output_bytes];
+    k12_reader.read(&mut k12_output);
+    assert_eq!(output, k12_output);
 
     hex::encode(output)
 }
