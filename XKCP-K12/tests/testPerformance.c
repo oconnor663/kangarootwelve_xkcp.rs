@@ -26,6 +26,10 @@ http://creativecommons.org/publicdomain/zero/1.0/
 #include "timing.h"
 #include "testPerformance.h"
 
+#if !defined(__x86_64__) && !defined(_M_X64) && !defined(__i386__) && !defined(_M_IX86)
+#undef KeccakP1600_enable_simd_options
+#endif
+
 #define BIG_BUFFER_SIZE (2*1024*1024)
 ALIGN(64) uint8_t bigBuffer[BIG_BUFFER_SIZE];
 
@@ -46,13 +50,13 @@ cycles_t measurePerformance(int (*impl)(const unsigned char*, size_t,
     measureTimingEnd
 }
 
-#ifndef KeccakP1600_disableParallelism
+#if defined(KeccakP1600_enable_simd_options) && !defined(KeccakP1600_disableParallelism)
 void KangarooTwelve_SetProcessorCapabilities();
 #endif
 
 void printKangarooTwelvePerformanceHeader( void )
 {
-#ifndef KeccakP1600_disableParallelism
+#if defined(KeccakP1600_enable_simd_options) && !defined(KeccakP1600_disableParallelism)
     KangarooTwelve_SetProcessorCapabilities();
 #endif
     printf("*** KangarooTwelve ***\n");
@@ -119,13 +123,13 @@ void testPerformanceFull(int (*impl)(const unsigned char*, size_t,
             timePlus8Blocks = measurePerformance(impl, calibration, i+8*chunkSize);
             timePlus168Blocks = measurePerformance(impl, calibration, i+168*chunkSize);
         }
-        printf("%8u bytes: %9"PRId64" cycles, %6.3f cycles/byte\n", i, time, time*1.0/i);
+        printf("%8u bytes: %9"PRId64" %s, %6.3f %s/byte\n", i, time, getTimerUnit(), time*1.0/i, getTimerUnit());
         if (displaySlope) {
-            printf("     +1 block:  %9"PRId64" cycles, %6.3f cycles/byte (slope)\n", timePlus1Block, (timePlus1Block-(double)(time))*1.0/chunkSize/1.0);
-            printf("     +2 blocks: %9"PRId64" cycles, %6.3f cycles/byte (slope)\n", timePlus2Blocks, (timePlus2Blocks-(double)(time))*1.0/chunkSize/2.0);
-            printf("     +4 blocks: %9"PRId64" cycles, %6.3f cycles/byte (slope)\n", timePlus4Blocks, (timePlus4Blocks-(double)(time))*1.0/chunkSize/4.0);
-            printf("     +8 blocks: %9"PRId64" cycles, %6.3f cycles/byte (slope)\n", timePlus8Blocks, (timePlus8Blocks-(double)(time))*1.0/chunkSize/8.0);
-            printf("   +168 blocks: %9"PRId64" cycles, %6.3f cycles/byte (slope)\n", timePlus168Blocks, (timePlus168Blocks-(double)(time))*1.0/chunkSize/168.0);
+            printf("     +1 block:  %9"PRId64" %s, %6.3f %s/byte (slope)\n", timePlus1Block, getTimerUnit(), (timePlus1Block-(double)(time))*1.0/chunkSize/1.0, getTimerUnit());
+            printf("     +2 blocks: %9"PRId64" %s, %6.3f %s/byte (slope)\n", timePlus2Blocks, getTimerUnit(), (timePlus2Blocks-(double)(time))*1.0/chunkSize/2.0, getTimerUnit());
+            printf("     +4 blocks: %9"PRId64" %s, %6.3f %s/byte (slope)\n", timePlus4Blocks, getTimerUnit(), (timePlus4Blocks-(double)(time))*1.0/chunkSize/4.0, getTimerUnit());
+            printf("     +8 blocks: %9"PRId64" %s, %6.3f %s/byte (slope)\n", timePlus8Blocks, getTimerUnit(), (timePlus8Blocks-(double)(time))*1.0/chunkSize/8.0, getTimerUnit());
+            printf("   +168 blocks: %9"PRId64" %s, %6.3f %s/byte (slope)\n", timePlus168Blocks, getTimerUnit(), (timePlus168Blocks-(double)(time))*1.0/chunkSize/168.0, getTimerUnit());
             displaySlope = 0;
         }
     }
@@ -134,7 +138,7 @@ void testPerformanceFull(int (*impl)(const unsigned char*, size_t,
         unsigned int i  = (unsigned int)floor(I+0.5);
         cycles_t time;
         time = measurePerformance(impl, calibration, i);
-        printf("%8u bytes: %9"PRId64" cycles, %6.3f cycles/byte\n", i, time, time*1.0/i);
+        printf("%8u bytes: %9"PRId64" %s, %6.3f %s/byte\n", i, time, getTimerUnit(), time*1.0/i, getTimerUnit());
     }
     printf("\n\n");
 }
