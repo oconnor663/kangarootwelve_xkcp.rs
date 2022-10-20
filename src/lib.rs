@@ -19,7 +19,6 @@
 //! assert_eq!(hash1, hash2);
 //!
 //! // Extended output. OutputReader also implements Read.
-//! # #[cfg(feature = "std")] {
 //! let mut hasher = kangarootwelve_xkcp::Hasher::new();
 //! hasher.update(b"foobarbaz");
 //! let mut output_reader = hasher.finalize_xof();
@@ -29,7 +28,6 @@
 //!
 //! // Print a hash as hex.
 //! println!("{}", hash1.to_hex());
-//! # }
 //! # Ok(())
 //! # }
 //! ```
@@ -92,12 +90,12 @@ pub fn hash(input: &[u8]) -> Hash {
 /// assert_eq!(hasher.finalize(), kangarootwelve_xkcp::hash(b"foobarbaz"));
 ///
 /// // Extended output. OutputReader also implements Read and Seek.
-/// # #[cfg(feature = "std")] {
+/// let mut hasher = kangarootwelve_xkcp::Hasher::new();
+/// hasher.update(b"foobarbaz");
 /// let mut output = [0; 1000];
 /// let mut output_reader = hasher.finalize_xof();
-/// output_reader.fill(&mut output);
+/// output_reader.squeeze(&mut output);
 /// assert_eq!(&output[..32], kangarootwelve_xkcp::hash(b"foobarbaz").as_bytes());
-/// # }
 /// # Ok(())
 /// # }
 /// ```
