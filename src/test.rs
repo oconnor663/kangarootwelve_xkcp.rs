@@ -1,4 +1,4 @@
-use crate::{hash, Hasher};
+use crate::{Hasher, hash};
 
 #[test]
 #[should_panic]
