@@ -1,6 +1,6 @@
 [package]
 name = "kangarootwelve_xkcp"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 authors = ["Jack O'Connor <oconnor663@gmail.com>"]
 description = "An FFI wrapper for the XKCP implementation of the KangarooTwelve hash function"
