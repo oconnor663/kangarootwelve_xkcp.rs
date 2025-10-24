@@ -49,10 +49,10 @@ fn k12_hex(input: &[u8], customization: &[u8], num_output_bytes: usize) -> Strin
     }
 
     // Finally, check that the `k12` crate gives the same answer too.
-    use digest::{ExtendableOutputDirty, Update, XofReader};
-    let mut k12_state = k12::KangarooTwelve::new_with_customization(customization);
+    use digest::{ExtendableOutput, Update, XofReader};
+    let mut k12_state = k12::KangarooTwelve::from_core(k12::KangarooTwelveCore::new(customization));
     k12_state.update(input);
-    let mut k12_reader = k12_state.finalize_xof_dirty();
+    let mut k12_reader = k12_state.finalize_xof();
     let mut k12_output = vec![0; num_output_bytes];
     k12_reader.read(&mut k12_output);
     assert_eq!(output, k12_output);
@@ -183,4 +183,11 @@ fn test_vector_14() {
     let mut customization = vec![0; 41 * 41 * 41];
     fill_pattern(&mut customization);
     assert_eq!(expected, k12_hex(&input, &customization, 32));
+}
+
+#[test]
+fn test_to_hex() {
+    let output = hash(b"foo");
+    let expected = hex::encode(&output.as_bytes());
+    assert_eq!(expected.as_str(), output.to_hex().as_str());
 }

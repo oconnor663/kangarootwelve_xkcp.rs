@@ -1,5 +1,5 @@
-use anyhow::{bail, ensure, Context, Result};
-use clap::{App, Arg};
+use anyhow::{Result, bail, ensure};
+use clap::Parser;
 use std::cmp;
 use std::fs::File;
 use std::io;
@@ -8,128 +8,54 @@ use std::path::{Path, PathBuf};
 
 const NAME: &str = "k12sum";
 
-const FILE_ARG: &str = "FILE";
-const LENGTH_ARG: &str = "length";
-const CUSTOM_ARG: &str = "custom";
-const MMAP_ARG: &str = "mmap";
-const NO_NAMES_ARG: &str = "no-names";
-const RAW_ARG: &str = "raw";
-const CHECK_ARG: &str = "check";
-const QUIET_ARG: &str = "quiet";
-
+#[derive(Parser)]
+#[command(version, max_term_width(100))]
 struct Args {
-    inner: clap::ArgMatches<'static>,
-    file_args: Vec<PathBuf>,
-}
+    /// Files to hash, or checkfiles to check
+    ///
+    /// When no file is given, or when - is given, read standard input.
+    file: Vec<PathBuf>,
 
-impl Args {
-    fn parse() -> Result<Self> {
-        let inner = App::new(NAME)
-            .version(env!("CARGO_PKG_VERSION"))
-            .arg(Arg::with_name(FILE_ARG).multiple(true).help(
-                "Files to hash, or checkfiles to check. When no file is given,\n\
-                 or when - is given, read standard input.",
-            ))
-            .arg(
-                Arg::with_name(LENGTH_ARG)
-                    .long(LENGTH_ARG)
-                    .short("l")
-                    .takes_value(true)
-                    .value_name("LEN")
-                    .help(
-                        "The number of output bytes, prior to hex\n\
-                         encoding (default 32)",
-                    ),
-            )
-            .arg(
-                Arg::with_name(CUSTOM_ARG)
-                    .long(CUSTOM_ARG)
-                    .takes_value(true)
-                    .value_name("STR")
-                    .help("The optional customization string"),
-            )
-            .arg(
-                Arg::with_name(MMAP_ARG)
-                    .long(MMAP_ARG)
-                    .help("Reads the input using memory mapping"),
-            )
-            .arg(
-                Arg::with_name(NO_NAMES_ARG)
-                    .long(NO_NAMES_ARG)
-                    .help("Omits filenames in the output"),
-            )
-            .arg(Arg::with_name(RAW_ARG).long(RAW_ARG).help(
-                "Writes raw output bytes to stdout, rather than hex.\n\
-                 --no-names is implied. In this case, only a single\n\
-                 input is allowed.",
-            ))
-            .arg(
-                Arg::with_name(CHECK_ARG)
-                    .long(CHECK_ARG)
-                    .short("c")
-                    .conflicts_with(LENGTH_ARG)
-                    .conflicts_with(RAW_ARG)
-                    .conflicts_with(NO_NAMES_ARG)
-                    .help("Reads K12 sums from the [file]s and checks them"),
-            )
-            .arg(
-                Arg::with_name(QUIET_ARG)
-                    .long(QUIET_ARG)
-                    .requires(CHECK_ARG)
-                    .help(
-                        "Skips printing OK for each successfully verified file.\n\
-                         Must be used with --check.",
-                    ),
-            )
-            // wild::args_os() is equivalent to std::env::args_os() on Unix,
-            // but on Windows it adds support for globbing.
-            .get_matches_from(wild::args_os());
-        let file_args = if let Some(iter) = inner.values_of_os(FILE_ARG) {
-            iter.map(|s| s.into()).collect()
-        } else {
-            vec!["-".into()]
-        };
-        if inner.is_present(RAW_ARG) && file_args.len() > 1 {
-            bail!("Only one filename can be provided when using --raw");
-        }
-        Ok(Self { inner, file_args })
-    }
+    /// The number of output bytes, before hex encoding
+    #[arg(short, long, default_value_t = 32, value_name("LEN"))]
+    length: u64,
 
-    fn check(&self) -> bool {
-        self.inner.is_present(CHECK_ARG)
-    }
+    /// The optional customization string
+    ///
+    /// Cannot be used with --keyed.
+    #[arg(long, value_name("STR"))]
+    custom: Option<String>,
 
-    fn raw(&self) -> bool {
-        self.inner.is_present(RAW_ARG)
-    }
+    /// Enable memory mapping
+    #[arg(long)]
+    mmap: bool,
 
-    fn custom(&self) -> &[u8] {
-        if let Some(custom) = self.inner.value_of(CUSTOM_ARG) {
-            custom.as_bytes()
-        } else {
-            &[]
-        }
-    }
+    /// Omit filenames in the output
+    #[arg(long)]
+    no_names: bool,
 
-    fn mmap(&self) -> bool {
-        self.inner.is_present(MMAP_ARG)
-    }
+    /// Write raw output bytes to stdout, rather than hex
+    ///
+    /// --no-names is implied. In this case, only a single input is allowed.
+    #[arg(long)]
+    raw: bool,
 
-    fn no_names(&self) -> bool {
-        self.inner.is_present(NO_NAMES_ARG)
-    }
+    /// Read K12 sums from the [FILE]s and check them
+    #[arg(
+        short,
+        long,
+        conflicts_with("custom"),
+        conflicts_with("length"),
+        conflicts_with("raw"),
+        conflicts_with("no_names")
+    )]
+    check: bool,
 
-    fn len(&self) -> Result<u64> {
-        if let Some(length) = self.inner.value_of(LENGTH_ARG) {
-            length.parse::<u64>().context("Failed to parse length.")
-        } else {
-            Ok(32)
-        }
-    }
-
-    fn quiet(&self) -> bool {
-        self.inner.is_present(QUIET_ARG)
-    }
+    /// Skip printing OK for each checked file
+    ///
+    /// Must be used with --check.
+    #[arg(long, requires("check"))]
+    quiet: bool,
 }
 
 enum Input {
@@ -144,13 +70,13 @@ impl Input {
     // filepaths that appear in a checkfile.
     fn open(path: &Path, args: &Args) -> Result<Self> {
         if path == Path::new("-") {
-            if args.mmap() {
+            if args.mmap {
                 bail!("cannot use --mmap with standard input");
             }
             return Ok(Self::Stdin);
         }
         let file = File::open(path)?;
-        if args.mmap() {
+        if args.mmap {
             let mmap = mmap_file(&file)?;
             return Ok(Self::Mmap(io::Cursor::new(mmap)));
         }
@@ -172,7 +98,7 @@ impl Input {
                 copy_wide(lock, &mut hasher)?;
             }
         }
-        Ok(hasher.finalize_custom_xof(args.custom()))
+        Ok(hasher.finalize_custom_xof(args.custom.as_ref().map(String::as_bytes).unwrap_or(&[])))
     }
 }
 
@@ -228,7 +154,7 @@ fn mmap_file(file: &File) -> Result<memmap::Mmap> {
 
 fn write_hex_output(mut output: kangarootwelve_xkcp::OutputReader, args: &Args) -> Result<()> {
     // Encoding multiples of the rate is most efficient.
-    let mut len = args.len()?;
+    let mut len = args.length;
     let mut block = [0; kangarootwelve_xkcp::RATE];
     while len > 0 {
         output.squeeze(&mut block);
@@ -241,7 +167,7 @@ fn write_hex_output(mut output: kangarootwelve_xkcp::OutputReader, args: &Args) 
 }
 
 fn write_raw_output(output: kangarootwelve_xkcp::OutputReader, args: &Args) -> Result<()> {
-    let mut output = output.take(args.len()?);
+    let mut output = output.take(args.length);
     let stdout = std::io::stdout();
     let mut handler = stdout.lock();
     std::io::copy(&mut output, &mut handler)?;
@@ -400,11 +326,11 @@ fn parse_check_line(mut line: &str) -> Result<ParsedCheckLine> {
 fn hash_one_input(path: &Path, args: &Args) -> Result<()> {
     let mut input = Input::open(path, args)?;
     let output = input.hash(args)?;
-    if args.raw() {
+    if args.raw {
         write_raw_output(output, args)?;
         return Ok(());
     }
-    if args.no_names() {
+    if args.no_names {
         write_hex_output(output, args)?;
         println!();
         return Ok(());
@@ -459,7 +385,7 @@ fn check_one_line(line: &str, args: &Args) -> bool {
     };
     // This is a constant-time comparison.
     if expected_hash == found_hash {
-        if !args.quiet() {
+        if !args.quiet {
             println!("{}: OK", file_string);
         }
         true
@@ -489,11 +415,18 @@ fn check_one_checkfile(path: &Path, args: &Args, some_file_failed: &mut bool) ->
 }
 
 fn main() -> Result<()> {
-    let args = Args::parse()?;
+    let args = Args::parse();
     let mut some_file_failed = false;
-    // Note that file_args automatically includes `-` if nothing is given.
-    for path in &args.file_args {
-        if args.check() {
+    let file_args = if !args.file.is_empty() {
+        args.file.clone()
+    } else {
+        vec!["-".into()]
+    };
+    if args.raw && file_args.len() > 1 {
+        bail!("Only one filename can be provided when using --raw");
+    }
+    for path in &file_args {
+        if args.check {
             // A hash mismatch or a failure to read a hashed file will be
             // printed in the checkfile loop, and will not propagate here.
             // This is similar to the explicit error handling we do in the

@@ -10,12 +10,12 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.27"
-clap = { version = "2.33.0", default-features = false }
+clap = { version = "4.5.50", features = ["derive", "wrap_help"] }
 hex = "0.4.2"
 kangarootwelve_xkcp = { version = "0.1", path = ".." }
 memmap = "0.7.0"
 wild = "2.0.3"
 
 [dev-dependencies]
-duct = "0.13.3"
+duct = "1.1.0"
 tempfile = "3.1.0"

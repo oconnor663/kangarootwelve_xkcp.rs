@@ -264,7 +264,7 @@ impl Hash {
     /// you need to compare hashes, prefer the `Hash` type.
     ///
     /// [`ArrayString`]: https://docs.rs/arrayvec/0.5.1/arrayvec/struct.ArrayString.html
-    pub fn to_hex(&self) -> ArrayString<[u8; 2 * 32]> {
+    pub fn to_hex(&self) -> ArrayString<64> {
         let mut s = ArrayString::new();
         let table = b"0123456789abcdef";
         for &b in self.0.iter() {
