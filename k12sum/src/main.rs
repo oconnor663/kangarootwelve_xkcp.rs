@@ -415,7 +415,9 @@ fn check_one_checkfile(path: &Path, args: &Args, some_file_failed: &mut bool) ->
 }
 
 fn main() -> Result<()> {
-    let args = Args::parse();
+    // wild::args_os() is equivalent to std::env::args_os() on Unix, but on Windows it adds support
+    // for globbing.
+    let args = Args::parse_from(wild::args_os());
     let mut some_file_failed = false;
     let file_args = if !args.file.is_empty() {
         args.file.clone()
