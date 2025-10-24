@@ -17,22 +17,19 @@ jobs:
       matrix:
         target: [
           { "os": "ubuntu-latest",  "rust-target": "x86_64-unknown-linux-musl", "name": "Linux" },
-          { "os": "macOS-latest",   "rust-target": "x86_64-apple-darwin",       "name": "macOS" },
+          { "os": "macOS-latest",   "rust-target": "aarch64-apple-darwin",      "name": "macOS" },
           { "os": "windows-latest", "rust-target": "x86_64-pc-windows-msvc",    "name": "Windows" },
         ]
 
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions/setup-python@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.x"
+          python-version: "3.14"
       - run: pip install PyGithub
       - run: sudo apt-get install musl-tools
         if: matrix.target.os == 'ubuntu-latest'
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
       - run: rustup target add ${{ matrix.target.rust-target }}
       - name: build k12sum
         id: build_k12sum
