@@ -6,7 +6,7 @@ description = "A command line implementation of the KangarooTwelve hash function
 repository = "https://github.com/oconnor663/kangarootwelve_xkcp.rs"
 license-file = "../LICENSE"
 readme = "../README.md"
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 anyhow = "1.0.27"
