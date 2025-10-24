@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        target: ["generic32", "generic64", "generic64noAsm", "plain64"]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - name: Install xsltproc
+      run: sudo apt-get install xsltproc
+    - name: Build
+      run: make ${{ matrix.target }}/KTtests ${{ matrix.target }}/libKT.a ${{ matrix.target }}/libKT.so
+    - name: Test
+      run: bin/${{ matrix.target }}/KTtests -K12

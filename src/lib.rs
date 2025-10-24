@@ -107,7 +107,7 @@ impl Hasher {
     pub fn new() -> Self {
         let mut inner = MaybeUninit::uninit();
         let inner = unsafe {
-            let ret = ffi::KangarooTwelve_Initialize(inner.as_mut_ptr(), 0);
+            let ret = ffi::KangarooTwelve_Initialize(inner.as_mut_ptr(), 128, 0);
             debug_assert_eq!(0, ret);
             inner.assume_init()
         };

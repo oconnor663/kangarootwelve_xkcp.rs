@@ -134,6 +134,7 @@ fn main() {
 
     portable_build.compile("k12");
 
+    println!("cargo:rustc-check-cfg=cfg(k12_bindings, values(\"optimized64\", \"plain64\", \"inplace32bi\"))");
     let k12_bindings = match target_implementation {
         TargetImplementation::Optimized64 | TargetImplementation::Optimized64NoAsm => "optimized64",
         TargetImplementation::Plain64 => "plain64",
