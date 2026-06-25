@@ -1,5 +1,5 @@
 use duct::cmd;
-use kangarootwelve_xkcp::{hash, Hasher};
+use kangarootwelve_xkcp::{Hasher, hash};
 use std::ffi::OsString;
 use std::fs;
 use std::path::PathBuf;
@@ -54,10 +54,22 @@ fn test_hash_many() {
     let expected_no_names = format!("{}\n{}", foo_hash.to_hex(), bar_hash.to_hex());
     assert_eq!(expected_no_names, output_no_names);
 
-    // Repeat that, with --mmap.
-    let output_mmap = cmd!(k12sum_exe(), "--no-names", "--mmap", &file1, &file2)
+    // Repeat that, with --no-mmap.
+    let output_mmap = cmd!(k12sum_exe(), "--no-names", "--no-mmap", &file1, &file2)
         .read()
         .unwrap();
+    assert_eq!(expected_no_names, output_mmap);
+
+    // Repeat that, with --num-threads=1.
+    let output_mmap = cmd!(
+        k12sum_exe(),
+        "--no-names",
+        "--num-threads=1",
+        &file1,
+        &file2
+    )
+    .read()
+    .unwrap();
     assert_eq!(expected_no_names, output_mmap);
 }
 
@@ -139,15 +151,6 @@ fn test_raw_with_multi_files_is_an_error() {
 
     // Make sure it errors when both file are passed
     let result = cmd!(k12sum_exe(), "--raw", f1.path(), f2.path())
-        .stderr_capture()
-        .run();
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_mmap_stdin_is_an_error() {
-    let result = cmd!(k12sum_exe(), "--mmap")
-        .stdin_bytes("foo")
         .stderr_capture()
         .run();
     assert!(result.is_err());

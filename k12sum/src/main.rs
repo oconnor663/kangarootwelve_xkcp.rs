@@ -26,9 +26,18 @@ struct Args {
     #[arg(long, value_name("STR"))]
     custom: Option<String>,
 
-    /// Enable memory mapping
+    /// The maximum number of threads to use
+    ///
+    /// By default, this is the number of logical cores. If this flag is
+    /// omitted, or if its value is 0, RAYON_NUM_THREADS is also respected.
+    #[arg(long, value_name("NUM"))]
+    num_threads: Option<usize>,
+
+    /// Disable memory mapping
+    ///
+    /// Currently this also disables multithreading.
     #[arg(long)]
-    mmap: bool,
+    no_mmap: bool,
 
     /// Omit filenames in the output
     #[arg(long)]
@@ -70,21 +79,27 @@ impl Input {
     // filepaths that appear in a checkfile.
     fn open(path: &Path, args: &Args) -> Result<Self> {
         if path == Path::new("-") {
-            if args.mmap {
-                bail!("cannot use --mmap with standard input");
-            }
             return Ok(Self::Stdin);
         }
         let file = File::open(path)?;
-        if args.mmap {
-            let mmap = mmap_file(&file)?;
-            return Ok(Self::Mmap(io::Cursor::new(mmap)));
+        if !args.no_mmap {
+            // Heuristic: memory mapping isn't worth it below 16 KiB.
+            if file.metadata()?.len() >= 16 * 1024 {
+                // If memory mapping encounters an error, fall back to normal reads.
+                if let Ok(mmap) = mmap_file(&file) {
+                    return Ok(Self::Mmap(io::Cursor::new(mmap)));
+                }
+            }
         }
         Ok(Self::File(file))
     }
 
     fn hash(&mut self, args: &Args) -> Result<kangarootwelve_xkcp::OutputReader> {
-        let mut hasher = kangarootwelve_xkcp::Hasher::new();
+        let mut hasher = if args.no_mmap || args.num_threads == Some(1) {
+            kangarootwelve_xkcp::Hasher::new()
+        } else {
+            kangarootwelve_xkcp::Hasher::new_rayon()
+        };
         match self {
             Self::Mmap(cursor) => {
                 hasher.update(cursor.get_ref());
@@ -427,25 +442,32 @@ fn main() -> Result<()> {
     if args.raw && file_args.len() > 1 {
         bail!("Only one filename can be provided when using --raw");
     }
-    for path in &file_args {
-        if args.check {
-            // A hash mismatch or a failure to read a hashed file will be
-            // printed in the checkfile loop, and will not propagate here.
-            // This is similar to the explicit error handling we do in the
-            // hashing case immediately below. In these cases,
-            // some_file_failed will be set to false.
-            check_one_checkfile(path, &args, &mut some_file_failed)?;
-        } else {
-            // Errors encountered in hashing are tolerated and printed to
-            // stderr. This allows e.g. `k12sum *` to print errors for
-            // non-files and keep going. However, if we encounter any
-            // errors we'll still return non-zero at the end.
-            let result = hash_one_input(path, &args);
-            if let Err(e) = result {
-                some_file_failed = true;
-                eprintln!("{}: {}: {}", NAME, path.to_string_lossy(), e);
+    let mut thread_pool_builder = rayon::ThreadPoolBuilder::new();
+    if let Some(num_threads) = args.num_threads {
+        thread_pool_builder = thread_pool_builder.num_threads(num_threads);
+    }
+    let thread_pool = thread_pool_builder.build()?;
+    thread_pool.install(|| {
+        for path in &file_args {
+            if args.check {
+                // A hash mismatch or a failure to read a hashed file will be
+                // printed in the checkfile loop, and will not propagate here.
+                // This is similar to the explicit error handling we do in the
+                // hashing case immediately below. In these cases,
+                // some_file_failed will be set to false.
+                check_one_checkfile(path, &args, &mut some_file_failed)?;
+            } else {
+                // Errors encountered in hashing are tolerated and printed to
+                // stderr. This allows e.g. `k12sum *` to print errors for
+                // non-files and keep going. However, if we encounter any
+                // errors we'll still return non-zero at the end.
+                let result = hash_one_input(path, &args);
+                if let Err(e) = result {
+                    some_file_failed = true;
+                    eprintln!("{}: {}: {}", NAME, path.to_string_lossy(), e);
+                }
             }
         }
-    }
-    std::process::exit(if some_file_failed { 1 } else { 0 });
+        std::process::exit(if some_file_failed { 1 } else { 0 });
+    })
 }
