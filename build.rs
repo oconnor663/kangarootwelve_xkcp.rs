@@ -30,6 +30,7 @@ fn generate_bindings(implementation: &Implementation) {
     };
     let bindings = bindgen::Builder::default()
         .header("XKCP-K12/lib/KangarooTwelve.h")
+        .header("XKCP-K12/lib/KT-threadpool.h")
         .clang_arg(arch_arg)
         .clang_arg(format!("-I{}", include_dir))
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

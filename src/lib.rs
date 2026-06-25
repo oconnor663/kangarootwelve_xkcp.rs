@@ -83,34 +83,79 @@ pub fn hash(input: &[u8]) -> Hash {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone)]
-pub struct Hasher(ffi::KangarooTwelve_Instance);
+pub struct Hasher {
+    instance: ffi::KangarooTwelve_Instance,
+    #[cfg(feature = "rayon")]
+    _pool: Option<Box<threadpool::RayonKTThreadPool>>,
+}
 
 impl Hasher {
-    /// Construct a new `Hasher` for the regular hash function.
+    /// Construct a single-threaded KangarooTwelve `Hasher`.
     pub fn new() -> Self {
-        let mut inner = MaybeUninit::uninit();
-        let inner = unsafe {
-            let ret = ffi::KangarooTwelve_Initialize(inner.as_mut_ptr(), 128, 0);
+        let mut instance = MaybeUninit::uninit();
+        let instance = unsafe {
+            let ret = ffi::KangarooTwelve_Initialize(instance.as_mut_ptr(), 128, 0);
             debug_assert_eq!(0, ret);
-            inner.assume_init()
+            instance.assume_init()
         };
         // These asserts help check that our struct definitions agree with C.
-        debug_assert_eq!(0, inner.fixedOutputLength);
-        debug_assert_eq!(0, inner.blockNumber);
-        debug_assert_eq!(0, inner.queueAbsorbedLen);
-        debug_assert_eq!(inner.phase, 1);
-        debug_assert_eq!(0, inner.finalNode.byteIOIndex);
-        debug_assert_eq!(0, inner.finalNode.squeezing);
-        Self(inner)
+        debug_assert_eq!(0, instance.fixedOutputLength);
+        debug_assert_eq!(0, instance.blockNumber);
+        debug_assert_eq!(0, instance.queueAbsorbedLen);
+        debug_assert_eq!(instance.phase, 1);
+        debug_assert_eq!(0, instance.finalNode.byteIOIndex);
+        debug_assert_eq!(0, instance.finalNode.squeezing);
+        Self {
+            instance,
+            #[cfg(feature = "rayon")]
+            _pool: None,
+        }
+    }
+
+    /// Construct a multithreaded KangarooTwelve `Hasher`.
+    #[cfg(feature = "rayon")]
+    pub fn new_rayon() -> Self {
+        // Currently `thread_count` isn't used by the implementation, other than to check that it's
+        // greater than 1. It would be a good idea for reviewers to verify this when revendoring
+        // from upstream.
+        let thread_count = 2;
+        let pool = Box::new(threadpool::RayonKTThreadPool::new());
+        let mut instance = MaybeUninit::uninit();
+        let instance = unsafe {
+            let ret = ffi::KangarooTwelve_Initialize_Threaded(
+                instance.as_mut_ptr(),
+                128,
+                0,
+                &threadpool::RAYON_THREADPOOL_API as *const _ as *const _,
+                &*pool as *const _ as *const _ as *mut _,
+                thread_count,
+            );
+            debug_assert_eq!(0, ret);
+            instance.assume_init()
+        };
+        // These asserts help check that our struct definitions agree with C.
+        debug_assert_eq!(0, instance.fixedOutputLength);
+        debug_assert_eq!(0, instance.blockNumber);
+        debug_assert_eq!(0, instance.queueAbsorbedLen);
+        debug_assert_eq!(instance.phase, 1);
+        debug_assert_eq!(0, instance.finalNode.byteIOIndex);
+        debug_assert_eq!(0, instance.finalNode.squeezing);
+        Self {
+            instance,
+            #[cfg(feature = "rayon")]
+            _pool: Some(pool),
+        }
     }
 
     /// Add input bytes to the hash state. You can call this any number of
     /// times, until the `Hasher` is finalized.
     pub fn update(&mut self, input: &[u8]) {
-        assert_eq!(self.0.phase, 1, "this instance has already been finalized");
+        assert_eq!(
+            self.instance.phase, 1,
+            "this instance has already been finalized"
+        );
         unsafe {
-            let ret = ffi::KangarooTwelve_Update(&mut self.0, input.as_ptr(), input.len());
+            let ret = ffi::KangarooTwelve_Update(&mut self.instance, input.as_ptr(), input.len());
             debug_assert_eq!(0, ret);
         }
     }
@@ -132,17 +177,21 @@ impl Hasher {
     /// You can only finalize a `Hasher` once. Additional calls to any of the
     /// finalize methods will panic.
     pub fn finalize_custom(&mut self, customization: &[u8]) -> Hash {
-        assert_eq!(self.0.phase, 1, "this instance has already been finalized");
+        assert_eq!(
+            self.instance.phase, 1,
+            "this instance has already been finalized"
+        );
         let mut bytes = [0; 32];
         unsafe {
             let ret = ffi::KangarooTwelve_Final(
-                &mut self.0,
+                &mut self.instance,
                 std::ptr::null_mut(),
                 customization.as_ptr(),
                 customization.len(),
             );
             debug_assert_eq!(0, ret);
-            let ret = ffi::KangarooTwelve_Squeeze(&mut self.0, bytes.as_mut_ptr(), bytes.len());
+            let ret =
+                ffi::KangarooTwelve_Squeeze(&mut self.instance, bytes.as_mut_ptr(), bytes.len());
             debug_assert_eq!(0, ret);
         }
         bytes.into()
@@ -169,17 +218,40 @@ impl Hasher {
     ///
     /// [`OutputReader`]: struct.OutputReader.html
     pub fn finalize_custom_xof(&mut self, customization: &[u8]) -> OutputReader {
-        assert_eq!(self.0.phase, 1, "this instance has already been finalized");
+        assert_eq!(
+            self.instance.phase, 1,
+            "this instance has already been finalized"
+        );
         unsafe {
             let ret = ffi::KangarooTwelve_Final(
-                &mut self.0,
+                &mut self.instance,
                 std::ptr::null_mut(),
                 customization.as_ptr(),
                 customization.len(),
             );
             debug_assert_eq!(0, ret);
         }
-        OutputReader(self.0)
+        OutputReader(self.instance)
+    }
+}
+
+impl Clone for Hasher {
+    fn clone(&self) -> Self {
+        #[cfg(feature = "rayon")]
+        let pool = Box::new(threadpool::RayonKTThreadPool::new());
+        #[allow(unused_mut)]
+        let mut instance = self.instance;
+        #[cfg(feature = "rayon")]
+        {
+            // The `threadpool_api` pointer is static, so it's still valid, but the
+            // `threadpool_handle` pointer needs to point to the new pool.
+            instance.threadpool_handle = (&*pool) as *const _ as *const _ as *mut _;
+        }
+        Self {
+            instance,
+            #[cfg(feature = "rayon")]
+            _pool: Some(pool),
+        }
     }
 }
 
@@ -330,5 +402,68 @@ impl std::io::Read for OutputReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.squeeze(buf);
         Ok(buf.len())
+    }
+}
+
+/// This threadpool implementation is a thin wrapper around `rayon::spawn`, with just enough
+/// bookkeeping to support the `submit` and `wait_all` API functions.
+#[cfg(feature = "rayon")]
+mod threadpool {
+    use std::ffi::{c_int, c_void};
+    use std::sync::mpsc;
+
+    pub struct RayonKTThreadPool {
+        submit_wait_channel: (mpsc::Sender<()>, mpsc::Receiver<()>),
+    }
+
+    impl RayonKTThreadPool {
+        pub fn new() -> Self {
+            Self {
+                submit_wait_channel: mpsc::channel(),
+            }
+        }
+    }
+
+    pub static RAYON_THREADPOOL_API: crate::ffi::KT_ThreadPool_API =
+        crate::ffi::KT_ThreadPool_API {
+            min_input_size_for_threading: 1 << 21, // 2 MiB, consistent with upstream
+            submit: Some(rayon_submit),
+            wait_all: Some(rayon_wait_all),
+            // These two functions aren't needed by the implementation.
+            create: None,
+            destroy: None,
+        };
+
+    struct SendVoid(*mut c_void);
+    unsafe impl Send for SendVoid {}
+
+    unsafe extern "C" fn rayon_submit(
+        pool: *mut c_void,
+        work_fn: Option<unsafe extern "C" fn(*mut c_void)>,
+        work_data: *mut c_void,
+    ) -> c_int {
+        unsafe {
+            let pool = &mut *(pool as *mut RayonKTThreadPool);
+            let work_sender = pool.submit_wait_channel.0.clone();
+            let work_data_send = SendVoid(work_data);
+            rayon::spawn(move || {
+                let work_data_send = work_data_send; // force move
+                work_fn.unwrap_unchecked()(work_data_send.0);
+                // The RayonKTThreadPool knows that all the submitted jobs are finished when all
+                // the senders have dropped.
+                drop(work_sender);
+            });
+            0
+        }
+    }
+
+    unsafe extern "C" fn rayon_wait_all(pool: *mut c_void) {
+        let pool = unsafe { &mut *(pool as *mut RayonKTThreadPool) };
+        // Swap in a fresh channel for future calls to `submit`.
+        let (sender, receiver) = std::mem::replace(&mut pool.submit_wait_channel, mpsc::channel());
+        drop(sender);
+        // When all other senders have dropped, all the submitted jobs are finished.
+        // TODO: This can deadlock if we're already in the Rayon pool.
+        for _ in receiver {}
     }
 }

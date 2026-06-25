@@ -186,6 +186,20 @@ fn test_vector_14() {
 }
 
 #[test]
+#[cfg(feature = "rayon")]
+fn test_rayon() {
+    // Currently the minimum input size for activating threading is 2 MiB. Allocate a 5 MiB input
+    // and hash it in two pieces.
+    let mut input = vec![0; 5 * 1024 * 1024];
+    fill_pattern(&mut input);
+    let mut hasher = Hasher::new_rayon();
+    let (front, back) = input.split_at(input.len() / 2);
+    hasher.update(front);
+    hasher.update(back);
+    assert_eq!(hasher.finalize(), hash(&input));
+}
+
+#[test]
 fn test_to_hex() {
     let output = hash(b"foo");
     let expected = hex::encode(&output.as_bytes());
