@@ -183,8 +183,8 @@ fn test_newline_and_backslash_escaping_on_unix() {
 {0}  abcdef
 \\{0}  abc\\ndef
 \\{0}  abc\\\\def
-{0}  abc\rdef
-\\{0}  abc\r\\ndef
+\\{0}  abc\\rdef
+\\{0}  abc\\r\\ndef
 {0}  subdir/foo",
         empty_hash,
     );
@@ -197,6 +197,26 @@ fn test_newline_and_backslash_escaping_on_unix() {
     println!("{}", expected);
     println!();
     assert_eq!(expected, output);
+
+    let output = cmd!(k12sum_exe(), "--check")
+        .stdin_bytes(expected.as_bytes())
+        .dir(dir.path())
+        .stdout_capture()
+        .stderr_capture()
+        .run()
+        .unwrap();
+    let stdout = std::str::from_utf8(&output.stdout).unwrap();
+    let stderr = std::str::from_utf8(&output.stderr).unwrap();
+    let expected_check_output = "\
+abcdef: OK
+\\abc\\ndef: OK
+\\abc\\\\def: OK
+\\abc\\rdef: OK
+\\abc\\r\\ndef: OK
+subdir/foo: OK
+";
+    assert_eq!(expected_check_output, stdout);
+    assert_eq!("", stderr);
 }
 
 #[test]
@@ -364,6 +384,20 @@ fn test_check() {
          a: OK\n\
          b: OK\n\
          c/d: OK\n";
+    assert_eq!(expected_check_output, stdout);
+    assert_eq!("", stderr);
+
+    // Check the same file, but with Windows-style newlines.
+    let windows_style = expected_checkfile.replace('\n', "\r\n");
+    let output = cmd!(k12sum_exe(), "--check")
+        .stdin_bytes(windows_style.as_bytes())
+        .dir(dir.path())
+        .stdout_capture()
+        .stderr_capture()
+        .run()
+        .unwrap();
+    let stdout = std::str::from_utf8(&output.stdout).unwrap();
+    let stderr = std::str::from_utf8(&output.stderr).unwrap();
     assert_eq!(expected_check_output, stdout);
     assert_eq!("", stderr);
 

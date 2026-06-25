@@ -207,8 +207,11 @@ fn filepath_to_string(filepath: &Path) -> FilepathString {
         filepath_string = filepath_string.replace('\\', "/");
     }
     let mut is_escaped = false;
-    if filepath_string.contains('\\') || filepath_string.contains('\n') {
-        filepath_string = filepath_string.replace('\\', "\\\\").replace('\n', "\\n");
+    if filepath_string.contains(['\\', '\n', '\r']) {
+        filepath_string = filepath_string
+            .replace('\\', "\\\\")
+            .replace('\n', "\\n")
+            .replace('\r', "\\r");
         is_escaped = true;
     }
     FilepathString {
@@ -266,6 +269,7 @@ fn unescape(mut path: &str) -> Result<String> {
         match path[i + 1..].chars().next().unwrap() {
             // Anything other than a recognized escape sequence is an error.
             'n' => unescaped.push_str("\n"),
+            'r' => unescaped.push_str("\r"),
             '\\' => unescaped.push_str("\\"),
             _ => bail!("Invalid backslash escape"),
         }
@@ -284,8 +288,8 @@ struct ParsedCheckLine {
 }
 
 fn parse_check_line(mut line: &str) -> Result<ParsedCheckLine> {
-    // Trim off the trailing newline, if any.
-    line = line.trim_end_matches('\n');
+    // Trim off the trailing newlines, if any.
+    line = line.trim_end_matches(['\r', '\n']);
     // If there's a backslash at the front of the line, that means we need to
     // unescape the path below. This matches the behavior of e.g. md5sum.
     let first = if let Some(c) = line.chars().next() {
@@ -322,7 +326,7 @@ fn parse_check_line(mut line: &str) -> Result<ParsedCheckLine> {
     let file_string = line[prefix_len..].to_string();
     let file_path_string = if is_escaped {
         // If we detected a backslash at the start of the line earlier, now we
-        // need to unescape backslashes and newlines.
+        // need to unescape backslashes, newlines, and carriage returns.
         unescape(&file_string)?
     } else {
         file_string.clone().into()
