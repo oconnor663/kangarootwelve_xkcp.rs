@@ -127,11 +127,17 @@ fn main() {
     for c_file in c_files {
         portable_build.file(format!("XKCP-K12/lib/{}", c_file));
     }
+    // We need to do this compile first, because that means these outputs get linked first, which
+    // is important in some cases for letting the linker know which symbols from subsequent steps
+    // are needed.
+    portable_build.compile("k12");
 
     match &target_implementation {
         Implementation::Optimized64 | Implementation::Optimized64NoAsm => {
-            portable_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
-            portable_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-runtimeDispatch.c");
+            let mut optimized64_build = base_build.clone();
+            optimized64_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
+            optimized64_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-runtimeDispatch.c");
+            optimized64_build.compile("k12_optimized64");
 
             let mut ssse3_build = base_build.clone();
             if target_env != "msvc" {
@@ -176,28 +182,32 @@ fn main() {
             avx512_build.compile("k12_avx512");
         }
         Implementation::Armv8Asha3 => {
-            portable_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
-            portable_build.file("XKCP-K12/lib/ARMv8Asha3/KeccakP-1600-runtimeDispatch.c");
+            let mut arm_c_build = base_build.clone();
+            arm_c_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
+            arm_c_build.file("XKCP-K12/lib/ARMv8Asha3/KeccakP-1600-runtimeDispatch.c");
+            arm_c_build.compile("k12_armv8_sha3_c");
 
-            let mut asm_build = base_build.clone();
-            asm_build.flag("-Wa,-march=armv8.2-a+sha3");
+            let mut arm_asm_build = base_build.clone();
+            arm_asm_build.flag("-Wa,-march=armv8.2-a+sha3");
             if target_vendor == "apple" {
                 // Suppress ELF-only .type/.size directives in the assembly.
-                asm_build.flag("-Wa,-defsym,old_gas_syntax=1");
+                arm_asm_build.flag("-Wa,-defsym,old_gas_syntax=1");
             }
-            asm_build.file("XKCP-K12/lib/ARMv8Asha3/KeccakP-1600-ARMv8Asha3.S");
-            asm_build.compile("k12_armv8_sha3_asm");
+            arm_asm_build.file("XKCP-K12/lib/ARMv8Asha3/KeccakP-1600-ARMv8Asha3.S");
+            arm_asm_build.compile("k12_armv8_sha3_asm");
         }
         Implementation::Plain64 => {
-            portable_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
-            portable_build.file("XKCP-K12/lib/Plain64/KeccakP-1600-plain64.c");
+            let mut plain64_build = base_build.clone();
+            plain64_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
+            plain64_build.file("XKCP-K12/lib/Plain64/KeccakP-1600-plain64.c");
+            plain64_build.compile("k12_plain64");
         }
         Implementation::Inplace32BI => {
-            portable_build.file("XKCP-K12/lib/Inplace32BI/KeccakP-1600-inplace32BI.c");
+            let mut inplace32_build = base_build.clone();
+            inplace32_build.file("XKCP-K12/lib/Inplace32BI/KeccakP-1600-inplace32BI.c");
+            inplace32_build.compile("k12_inplace32bi");
         }
     }
-
-    portable_build.compile("k12");
 
     generate_bindings(&target_implementation);
 }
