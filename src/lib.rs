@@ -405,21 +405,30 @@ impl std::io::Read for OutputReader {
     }
 }
 
-/// This threadpool implementation is a thin wrapper around `rayon::spawn`, with just enough
-/// bookkeeping to support the `submit` and `wait_all` API functions.
+/// This threadpool implementation is a thin wrapper around `rayon::ParallelIterator`, which
+/// collects jobs through `submit` and runs them all in parallel when `wait_all` is called. Note
+/// that this approach should not be vulnerable to deadlocks, even if the hasher itself is
+/// instantiated in a Rayon thread pool of size 1. See `test_rayon_small_pool`.
 #[cfg(feature = "rayon")]
 mod threadpool {
+    use rayon::prelude::*;
     use std::ffi::{c_int, c_void};
-    use std::sync::mpsc;
+
+    struct WorkItem {
+        work_fn: Option<unsafe extern "C" fn(*mut c_void)>,
+        work_data: *mut c_void,
+    }
+
+    unsafe impl Send for WorkItem {}
 
     pub struct RayonKTThreadPool {
-        submit_wait_channel: (mpsc::Sender<()>, mpsc::Receiver<()>),
+        work_items: Vec<WorkItem>,
     }
 
     impl RayonKTThreadPool {
         pub fn new() -> Self {
             Self {
-                submit_wait_channel: mpsc::channel(),
+                work_items: Vec::new(),
             }
         }
     }
@@ -434,36 +443,22 @@ mod threadpool {
             destroy: None,
         };
 
-    struct SendVoid(*mut c_void);
-    unsafe impl Send for SendVoid {}
-
     unsafe extern "C" fn rayon_submit(
         pool: *mut c_void,
         work_fn: Option<unsafe extern "C" fn(*mut c_void)>,
         work_data: *mut c_void,
     ) -> c_int {
-        unsafe {
-            let pool = &mut *(pool as *mut RayonKTThreadPool);
-            let work_sender = pool.submit_wait_channel.0.clone();
-            let work_data_send = SendVoid(work_data);
-            rayon::spawn(move || {
-                let work_data_send = work_data_send; // force move
-                work_fn.unwrap_unchecked()(work_data_send.0);
-                // The RayonKTThreadPool knows that all the submitted jobs are finished when all
-                // the senders have dropped.
-                drop(work_sender);
-            });
-            0
-        }
+        let pool = unsafe { &mut *(pool as *mut RayonKTThreadPool) };
+        pool.work_items.push(WorkItem { work_fn, work_data });
+        0
     }
 
     unsafe extern "C" fn rayon_wait_all(pool: *mut c_void) {
         let pool = unsafe { &mut *(pool as *mut RayonKTThreadPool) };
-        // Swap in a fresh channel for future calls to `submit`.
-        let (sender, receiver) = std::mem::replace(&mut pool.submit_wait_channel, mpsc::channel());
-        drop(sender);
-        // When all other senders have dropped, all the submitted jobs are finished.
-        // TODO: This can deadlock if we're already in the Rayon pool.
-        for _ in receiver {}
+        std::mem::take(&mut pool.work_items)
+            .into_par_iter()
+            .for_each(|item| unsafe {
+                item.work_fn.unwrap_unchecked()(item.work_data);
+            });
     }
 }

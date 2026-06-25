@@ -200,6 +200,28 @@ fn test_rayon() {
 }
 
 #[test]
+#[cfg(feature = "rayon")]
+fn test_rayon_small_pool() {
+    // As above, 2 MiB is the minimum for using threading.
+    let mut input = vec![0; 5 * 1024 * 1024];
+    fill_pattern(&mut input);
+    let expected = hash(&input);
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .build()
+        .unwrap();
+    let hash = pool.install(|| {
+        // The creation of this hasher is already running in the Rayon thread pool, so when it
+        // spawns work items, they'll share the same pool. There's only one thread in this pool, so
+        // we're testing that this doesn't deadlock.
+        let mut hasher = Hasher::new_rayon();
+        hasher.update(&input);
+        hasher.finalize()
+    });
+    assert_eq!(expected, hash);
+}
+
+#[test]
 fn test_to_hex() {
     let output = hash(b"foo");
     let expected = hex::encode(&output.as_bytes());
