@@ -31,6 +31,9 @@ fn generate_bindings(implementation: &Implementation) {
     let bindings = bindgen::Builder::default()
         .header("XKCP-K12/lib/KangarooTwelve.h")
         .header("XKCP-K12/lib/KT-threadpool.h")
+        // bindgen's layout test for max_align_t fails on i686-unknown-linux-musl, and this crate
+        // doesn't use that libc type.
+        .blocklist_item("max_align_t")
         .clang_arg(arch_arg)
         .clang_arg(format!("-I{}", include_dir))
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
