@@ -10,6 +10,7 @@ use std::path::PathBuf;
 enum Implementation {
     Optimized64,
     Optimized64NoAsm, // Note that Optimized64NoAsm uses the same bindings as Optimized64.
+    Armv8Asha3,
     Plain64,
     Inplace32BI,
 }
@@ -18,6 +19,7 @@ fn generate_bindings(implementation: &Implementation) {
     let arch_arg = match implementation {
         Implementation::Optimized64
         | Implementation::Optimized64NoAsm
+        | Implementation::Armv8Asha3
         | Implementation::Plain64 => "-m64",
         Implementation::Inplace32BI => "-m32",
     };
@@ -25,6 +27,7 @@ fn generate_bindings(implementation: &Implementation) {
         Implementation::Optimized64 | Implementation::Optimized64NoAsm => {
             "XKCP-K12/lib/Optimized64"
         }
+        Implementation::Armv8Asha3 => "XKCP-K12/lib/ARMv8Asha3",
         Implementation::Plain64 => "XKCP-K12/lib/Plain64",
         Implementation::Inplace32BI => "XKCP-K12/lib/Inplace32BI",
     };
@@ -48,6 +51,7 @@ fn generate_bindings(implementation: &Implementation) {
 fn main() {
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let target_vendor = env::var("CARGO_CFG_TARGET_VENDOR").unwrap();
     let target_pointer_width = env::var("CARGO_CFG_TARGET_POINTER_WIDTH").unwrap();
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap(); // e.g. "msvc" on Windows
     let target_is_little_endian = match env::var("CARGO_CFG_TARGET_ENDIAN").unwrap().as_str() {
@@ -64,6 +68,11 @@ fn main() {
             // assembler syntax version.
             Implementation::Optimized64NoAsm
         }
+    } else if target_arch == "aarch64" && target_os != "windows" {
+        // This branch needs OS-specific runtime SHA3 detection, not just a
+        // GNU-like assembler. The current dispatcher supports Linux/Android
+        // getauxval and Apple sysctl, but not Windows.
+        Implementation::Armv8Asha3
     } else if target_pointer_width == "64" {
         Implementation::Plain64
     } else if target_pointer_width == "32" {
@@ -88,6 +97,9 @@ fn main() {
         Implementation::Optimized64 | Implementation::Optimized64NoAsm => {
             // These two targets share headers.
             base_build.include("XKCP-K12/lib/Optimized64");
+        }
+        Implementation::Armv8Asha3 => {
+            base_build.include("XKCP-K12/lib/ARMv8Asha3");
         }
         Implementation::Plain64 => {
             base_build.include("XKCP-K12/lib/Plain64");
@@ -162,6 +174,19 @@ fn main() {
             }
 
             avx512_build.compile("k12_avx512");
+        }
+        Implementation::Armv8Asha3 => {
+            portable_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
+            portable_build.file("XKCP-K12/lib/ARMv8Asha3/KeccakP-1600-runtimeDispatch.c");
+
+            let mut asm_build = base_build.clone();
+            asm_build.flag("-Wa,-march=armv8.2-a+sha3");
+            if target_vendor == "apple" {
+                // Suppress ELF-only .type/.size directives in the assembly.
+                asm_build.flag("-Wa,-defsym,old_gas_syntax=1");
+            }
+            asm_build.file("XKCP-K12/lib/ARMv8Asha3/KeccakP-1600-ARMv8Asha3.S");
+            asm_build.compile("k12_armv8_sha3_asm");
         }
         Implementation::Plain64 => {
             portable_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
