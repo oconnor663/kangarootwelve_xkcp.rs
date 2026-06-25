@@ -73,8 +73,16 @@ fn main() {
     let base_build = base_build; // immutable from here on
 
     let mut portable_build = base_build.clone();
-    portable_build.file("XKCP-K12/lib/KangarooTwelve.c");
-    // The different targets add additional portable files.
+    let c_files = [
+        "KangarooTwelve.c",
+        "KangarooTwelve-threading.c",
+        "KT-threadpool.c",
+        "KT-threadpool-pthread.c",
+        "KT-threadpool-sequential.c",
+    ];
+    for c_file in c_files {
+        portable_build.file(format!("XKCP-K12/lib/{}", c_file));
+    }
 
     match &target_implementation {
         TargetImplementation::Optimized64 | TargetImplementation::Optimized64NoAsm => {
