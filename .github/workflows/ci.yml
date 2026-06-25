@@ -52,5 +52,5 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
-    - run: cargo install cross
+    - run: cargo install cross --git https://github.com/cross-rs/cross
     - run: cross test --target ${{ matrix.arch }}
