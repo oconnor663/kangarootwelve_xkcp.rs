@@ -21,8 +21,6 @@ struct Args {
     length: u64,
 
     /// The optional customization string
-    ///
-    /// Cannot be used with --keyed.
     #[arg(long, value_name("STR"))]
     custom: Option<String>,
 
@@ -410,7 +408,7 @@ fn check_one_line(line: &str, args: &Args) -> bool {
     }
 }
 
-fn check_one_checkfile(path: &Path, args: &Args, some_file_failed: &mut bool) -> Result<()> {
+fn check_one_checkfile(path: &Path, args: &Args, files_failed: &mut u64) -> Result<()> {
     let checkfile_input = Input::open(path, args)?;
     let mut bufreader = io::BufReader::new(checkfile_input);
     let mut line = String::new();
@@ -424,7 +422,9 @@ fn check_one_checkfile(path: &Path, args: &Args, some_file_failed: &mut bool) ->
         // return, so it doesn't return a Result.
         let success = check_one_line(&line, args);
         if !success {
-            *some_file_failed = true;
+            // We use `files_failed > 0` to indicate a mismatch, so it's important for correctness
+            // that it's impossible for this counter to overflow.
+            *files_failed = files_failed.saturating_add(1);
         }
     }
 }
@@ -433,7 +433,7 @@ fn main() -> Result<()> {
     // wild::args_os() is equivalent to std::env::args_os() on Unix, but on Windows it adds support
     // for globbing.
     let args = Args::parse_from(wild::args_os());
-    let mut some_file_failed = false;
+    let mut files_failed = 0u64;
     let file_args = if !args.file.is_empty() {
         args.file.clone()
     } else {
@@ -454,8 +454,8 @@ fn main() -> Result<()> {
                 // printed in the checkfile loop, and will not propagate here.
                 // This is similar to the explicit error handling we do in the
                 // hashing case immediately below. In these cases,
-                // some_file_failed will be set to false.
-                check_one_checkfile(path, &args, &mut some_file_failed)?;
+                // files_failed will be incremented.
+                check_one_checkfile(path, &args, &mut files_failed)?;
             } else {
                 // Errors encountered in hashing are tolerated and printed to
                 // stderr. This allows e.g. `k12sum *` to print errors for
@@ -463,11 +463,19 @@ fn main() -> Result<()> {
                 // errors we'll still return non-zero at the end.
                 let result = hash_one_input(path, &args);
                 if let Err(e) = result {
-                    some_file_failed = true;
+                    files_failed = files_failed.saturating_add(1);
                     eprintln!("{}: {}: {}", NAME, path.to_string_lossy(), e);
                 }
             }
         }
-        std::process::exit(if some_file_failed { 1 } else { 0 });
+        if args.check && files_failed > 0 {
+            eprintln!(
+                "{}: WARNING: {} computed checksum{} did NOT match",
+                NAME,
+                files_failed,
+                if files_failed == 1 { "" } else { "s" },
+            );
+        }
+        std::process::exit(if files_failed > 0 { 1 } else { 0 });
     })
 }
