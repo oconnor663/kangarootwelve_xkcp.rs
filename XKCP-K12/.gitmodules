@@ -1,3 +1,0 @@
-[submodule "support/XKCBuild"]
-	path = support/XKCBuild
-	url = https://github.com/XKCP/XKCBuild.git
