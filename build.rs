@@ -5,12 +5,40 @@
 //! changes when we re-vendor upstream code.
 
 use std::env;
+use std::path::PathBuf;
 
-enum TargetImplementation {
+enum Implementation {
     Optimized64,
     Optimized64NoAsm, // Note that Optimized64NoAsm uses the same bindings as Optimized64.
     Plain64,
     Inplace32BI,
+}
+
+fn generate_bindings(implementation: &Implementation) {
+    let arch_arg = match implementation {
+        Implementation::Optimized64
+        | Implementation::Optimized64NoAsm
+        | Implementation::Plain64 => "-m64",
+        Implementation::Inplace32BI => "-m32",
+    };
+    let include_dir = match implementation {
+        Implementation::Optimized64 | Implementation::Optimized64NoAsm => {
+            "XKCP-K12/lib/Optimized64"
+        }
+        Implementation::Plain64 => "XKCP-K12/lib/Plain64",
+        Implementation::Inplace32BI => "XKCP-K12/lib/Inplace32BI",
+    };
+    let bindings = bindgen::Builder::default()
+        .header("XKCP-K12/lib/KangarooTwelve.h")
+        .clang_arg(arch_arg)
+        .clang_arg(format!("-I{}", include_dir))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        .generate()
+        .expect("failed to generate KangarooTwelve bindings");
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
+    bindings
+        .write_to_file(out_path)
+        .expect("failed to write KangarooTwelve bindings");
 }
 
 fn main() {
@@ -26,16 +54,16 @@ fn main() {
 
     let target_implementation = if target_arch == "x86_64" {
         if target_os != "windows" {
-            TargetImplementation::Optimized64
+            Implementation::Optimized64
         } else {
             // The current assembly implementation doesn't include a Windows
             // assembler syntax version.
-            TargetImplementation::Optimized64NoAsm
+            Implementation::Optimized64NoAsm
         }
     } else if target_pointer_width == "64" {
-        TargetImplementation::Plain64
+        Implementation::Plain64
     } else if target_pointer_width == "32" {
-        TargetImplementation::Inplace32BI
+        Implementation::Inplace32BI
     } else {
         panic!("unsupported target pointer width: {}", target_pointer_width);
     };
@@ -53,18 +81,18 @@ fn main() {
         base_build.define("BIG_ENDIAN", "1");
     }
     match &target_implementation {
-        TargetImplementation::Optimized64 | TargetImplementation::Optimized64NoAsm => {
+        Implementation::Optimized64 | Implementation::Optimized64NoAsm => {
             // These two targets share headers.
             base_build.include("XKCP-K12/lib/Optimized64");
         }
-        TargetImplementation::Plain64 => {
+        Implementation::Plain64 => {
             base_build.include("XKCP-K12/lib/Plain64");
         }
-        TargetImplementation::Inplace32BI => {
+        Implementation::Inplace32BI => {
             base_build.include("XKCP-K12/lib/Inplace32BI");
         }
     }
-    if let TargetImplementation::Optimized64NoAsm = &target_implementation {
+    if let Implementation::Optimized64NoAsm = &target_implementation {
         // Since Optimized64 and Optimized64NoAsm use the same header file,
         // KeccakP-1600-runtimeDispatch.c relies on this preprocessor var to
         // distinguish them.
@@ -85,7 +113,7 @@ fn main() {
     }
 
     match &target_implementation {
-        TargetImplementation::Optimized64 | TargetImplementation::Optimized64NoAsm => {
+        Implementation::Optimized64 | Implementation::Optimized64NoAsm => {
             portable_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
             portable_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-runtimeDispatch.c");
 
@@ -115,7 +143,7 @@ fn main() {
             avx512_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-timesN-AVX512.c");
             // For the non-asm build we add another file below.
 
-            if let TargetImplementation::Optimized64 = &target_implementation {
+            if let Implementation::Optimized64 = &target_implementation {
                 let mut asm_build = base_build.clone();
                 asm_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-AVX2.s");
                 asm_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-AVX512.s");
@@ -131,24 +159,16 @@ fn main() {
 
             avx512_build.compile("k12_avx512");
         }
-        TargetImplementation::Plain64 => {
+        Implementation::Plain64 => {
             portable_build.file("XKCP-K12/lib/Optimized64/KeccakP-1600-opt64.c");
             portable_build.file("XKCP-K12/lib/Plain64/KeccakP-1600-plain64.c");
         }
-        TargetImplementation::Inplace32BI => {
+        Implementation::Inplace32BI => {
             portable_build.file("XKCP-K12/lib/Inplace32BI/KeccakP-1600-inplace32BI.c");
         }
     }
 
     portable_build.compile("k12");
 
-    println!(
-        "cargo:rustc-check-cfg=cfg(k12_bindings, values(\"optimized64\", \"plain64\", \"inplace32bi\"))"
-    );
-    let k12_bindings = match target_implementation {
-        TargetImplementation::Optimized64 | TargetImplementation::Optimized64NoAsm => "optimized64",
-        TargetImplementation::Plain64 => "plain64",
-        TargetImplementation::Inplace32BI => "inplace32bi",
-    };
-    println!("cargo:rustc-cfg=k12_bindings=\"{}\"", k12_bindings);
+    generate_bindings(&target_implementation);
 }
