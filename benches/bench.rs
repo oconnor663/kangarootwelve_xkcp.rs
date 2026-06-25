@@ -109,7 +109,7 @@ fn bench_1024_kib_k12(b: &mut Bencher) {
     let mut input = RandomInput::new(b, 1024 * KIB);
     b.iter(|| {
         use digest::{ExtendableOutput, Update, XofReader};
-        let mut state = k12::KangarooTwelve::default();
+        let mut state = k12::Kt128::default();
         state.update(input.get());
         let mut reader = state.finalize_xof();
         let mut output = [0; 32];

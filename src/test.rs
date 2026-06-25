@@ -50,7 +50,7 @@ fn k12_hex(input: &[u8], customization: &[u8], num_output_bytes: usize) -> Strin
 
     // Finally, check that the `k12` crate gives the same answer too.
     use digest::{ExtendableOutput, Update, XofReader};
-    let mut k12_state = k12::KangarooTwelve::from_core(k12::KangarooTwelveCore::new(customization));
+    let mut k12_state = k12::CustomRefKt128::new_customized(customization);
     k12_state.update(input);
     let mut k12_reader = k12_state.finalize_xof();
     let mut k12_output = vec![0; num_output_bytes];
