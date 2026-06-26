@@ -1,4 +1,13 @@
-use crate::{Hasher, hash};
+use crate::{Hash, Hasher, OutputReader, hash};
+
+fn assert_send_sync<T: Send + Sync>() {}
+
+#[test]
+fn test_public_state_types_are_send_sync() {
+    assert_send_sync::<Hasher>();
+    assert_send_sync::<Hash>();
+    assert_send_sync::<OutputReader>();
+}
 
 #[test]
 #[should_panic]

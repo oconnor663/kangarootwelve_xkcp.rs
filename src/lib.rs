@@ -89,6 +89,11 @@ pub struct Hasher {
     _pool: Option<Box<threadpool::RayonKTThreadPool>>,
 }
 
+// SAFETY: `KangarooTwelve_Instance` contains raw pointers, so we need to explicitly declare `Send`
+// and `Sync`. All mutation is done through `&mut self` methods.
+unsafe impl Send for Hasher {}
+unsafe impl Sync for Hasher {}
+
 impl Hasher {
     /// Construct a single-threaded KangarooTwelve `Hasher`.
     pub fn new() -> Self {
@@ -375,6 +380,10 @@ impl fmt::Debug for Hash {
 #[derive(Clone)]
 pub struct OutputReader(ffi::KangarooTwelve_Instance);
 
+// SAFETY: Same as `Hasher` above.
+unsafe impl Send for OutputReader {}
+unsafe impl Sync for OutputReader {}
+
 impl OutputReader {
     /// Fill a buffer with output bytes and advance the position of the
     /// `OutputReader`. This is equivalent to [`Read::read`], except that it
@@ -419,6 +428,8 @@ mod threadpool {
         work_data: *mut c_void,
     }
 
+    // SAFETY: `WorkItem` is a task that C code is deliberately running on another thread, so it
+    // had *better* be `Send`.
     unsafe impl Send for WorkItem {}
 
     pub struct RayonKTThreadPool {
