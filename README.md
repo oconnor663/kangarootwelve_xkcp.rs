@@ -7,7 +7,7 @@ hash function. That implementation includes SSSE3, AVX2, AVX-512, and
 Armv8-A SHA3 optimizations, and it detects processor support at runtime.
 The `k12sum` sub-crate provides a command line interface.
 
-This package wraps C code via FFI, so you have to have a C compiler
+This crate vendors C code and wraps it with Bindgen, so you need libclang
 installed to build it.
 
 ## Usage
