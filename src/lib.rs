@@ -466,10 +466,17 @@ mod threadpool {
 
     unsafe extern "C" fn rayon_wait_all(pool: *mut c_void) {
         let pool = unsafe { &mut *(pool as *mut RayonKTThreadPool) };
-        std::mem::take(&mut pool.work_items)
-            .into_par_iter()
-            .for_each(|item| unsafe {
-                item.work_fn.unwrap_unchecked()(item.work_data);
-            });
+        // Clearing the work items `Vec` with a drop guard is the panic-safe way to do it. Panics
+        // here at this FFI boundary would be UB in any case, but we might as well do it right.
+        struct ClearGuard<'a, T>(&'a mut Vec<T>);
+        impl<T> Drop for ClearGuard<'_, T> {
+            fn drop(&mut self) {
+                self.0.clear();
+            }
+        }
+        let guard = ClearGuard(&mut pool.work_items);
+        guard.0.par_iter_mut().for_each(|item| unsafe {
+            item.work_fn.unwrap_unchecked()(item.work_data);
+        });
     }
 }

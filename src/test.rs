@@ -202,9 +202,12 @@ fn test_rayon() {
     let mut input = vec![0; 5 * 1024 * 1024];
     fill_pattern(&mut input);
     let mut hasher = Hasher::new_rayon();
-    let (front, back) = input.split_at(input.len() / 2);
-    hasher.update(front);
-    hasher.update(back);
+    // Do an uneven split of the input. This tends to avoid the case where the implementation
+    // reuses the exact same heap space for both operations, which makes it more likely that we see
+    // a segfault or something if we fail to clear the work items buffer between calls.
+    let three_mib = 3 * 1024 * 1024;
+    hasher.update(&input[..three_mib]);
+    hasher.update(&input[three_mib..]);
     assert_eq!(hasher.finalize(), hash(&input));
 }
 
