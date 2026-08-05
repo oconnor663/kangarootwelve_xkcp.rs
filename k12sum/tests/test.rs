@@ -28,6 +28,18 @@ fn test_hash_one_raw() {
 }
 
 #[test]
+#[cfg(windows)]
+fn test_null_device_on_windows() {
+    let expected = hash(b"").to_hex();
+    let output = cmd!(k12sum_exe(), "--no-names", "NUL").read().unwrap();
+    assert_eq!(expected.as_str(), output);
+    let output = cmd!(k12sum_exe(), "--no-names", "--no-mmap", "NUL")
+        .read()
+        .unwrap();
+    assert_eq!(expected.as_str(), output);
+}
+
+#[test]
 fn test_hash_many() {
     let dir = tempfile::tempdir().unwrap();
     let file1 = dir.path().join("file1");
